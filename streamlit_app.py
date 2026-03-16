@@ -854,7 +854,7 @@ def render_header_controls(server_state):
     with row2:
         st.text_input("Jam Handover", key="handover_time", placeholder="HH:mm")
 
-    controls = st.columns(4)
+    controls = st.columns(2)
     with controls[0]:
         if st.button("Buka Tim", use_container_width=True):
             try:
@@ -869,20 +869,6 @@ def render_header_controls(server_state):
                 st.rerun()
             except Exception as err:
                 set_feedback(str(err), ok=False)
-    with controls[2]:
-        if st.button("Retry Pending", use_container_width=True):
-            try:
-                retry_pending()
-                st.rerun()
-            except Exception as err:
-                set_feedback(str(err), ok=False)
-    with controls[3]:
-        if st.button("Reset ke sample", use_container_width=True):
-            st.session_state["report"] = load_sample_report()
-            sync_widgets_from_report()
-            save_draft()
-            set_feedback("Data dikembalikan ke sample awal.", ok=True)
-            st.rerun()
 
     lock = st.session_state.get("lock") or {}
     if lock:
@@ -909,19 +895,6 @@ def render_submit():
             set_feedback(str(err), ok=False)
             st.rerun()
     render_feedback()
-
-
-def render_admin(server_state):
-    with st.expander("Admin / Sistem", expanded=False):
-        integrations = server_state.get("integrations", {})
-        st.write(
-            {
-                "telegram_ready": integrations.get("telegram_ready"),
-                "sheets_ready": integrations.get("sheets_ready"),
-                "pending_queue": len(server_state.get("pending_queue", [])),
-                "tracked_roots": len(server_state.get("root_messages", {})),
-            }
-        )
 
 
 def main():
@@ -958,7 +931,6 @@ def main():
     st.markdown("---")
     render_detail()
     render_submit()
-    render_admin(server_state)
 
 
 if __name__ == "__main__":
