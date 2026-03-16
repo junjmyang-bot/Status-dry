@@ -1,3 +1,4 @@
+import html
 import json
 import os
 import shutil
@@ -306,23 +307,43 @@ def ensure_app_state():
         st.session_state["feedback_text"] = ""
         st.session_state["feedback_ok"] = True
         st.session_state["lock"] = None
-        sync_widgets_from_report()
+        st.session_state["team_id"] = "dry-team-1"
+        st.session_state["_pending_editor_sync"] = True
+        st.session_state["_editor_slot_no"] = None
+        sync_header_widgets_from_report(force=True)
 
 
-def sync_widgets_from_report():
+def sync_header_widgets_from_report(force=False):
     report = st.session_state["report"]
     meta = report["report_meta"]
     team_start = meta["team_start"]
-    slot = report["slots"][report["selected_slot"] - 1]
+    members = ", ".join(team_start.get("members") or [])
+    defaults = {
+        "work_date": datetime.strptime(meta["prd_date"], "%Y-%m-%d").date(),
+        "shift": team_start.get("shift") or "Shift 1",
+        "members": members,
+        "team_finish": clean_text(meta.get("team_finish")),
+        "handover_time": clean_text(meta.get("handover_time")),
+        "team_id": st.session_state.get("team_id", "dry-team-1"),
+        "lock_owner": st.session_state.get("lock_owner")
+        or (split_names(members)[0] if split_names(members) else "operator"),
+    }
+    for key, value in defaults.items():
+        if force or key not in st.session_state:
+            st.session_state[key] = value
 
-    st.session_state["work_date"] = datetime.strptime(meta["prd_date"], "%Y-%m-%d").date()
-    st.session_state["shift"] = team_start.get("shift") or "Shift 1"
-    st.session_state["members"] = ", ".join(team_start.get("members") or [])
-    st.session_state["team_finish"] = clean_text(meta.get("team_finish"))
-    st.session_state["handover_time"] = clean_text(meta.get("handover_time"))
-    st.session_state["team_id"] = st.session_state.get("team_id", "dry-team-1")
-    st.session_state["lock_owner"] = st.session_state.get("lock_owner") or (split_names(st.session_state["members"])[0] if split_names(st.session_state["members"]) else "operator")
 
+def sync_editor_widgets_from_selected_slot(force=False):
+    report = st.session_state["report"]
+    slot_no = report["selected_slot"]
+    if (
+        not force
+        and not st.session_state.get("_pending_editor_sync")
+        and st.session_state.get("_editor_slot_no") == slot_no
+    ):
+        return
+
+    slot = report["slots"][slot_no - 1]
     st.session_state["status_enum"] = slot["status_enum"]
     st.session_state["status_isi"] = clean_text(slot.get("status_isi"))
     st.session_state["needs_defrost"] = "yes" if slot.get("needs_defrost") is True else "no"
@@ -339,6 +360,8 @@ def sync_widgets_from_report():
     st.session_state["petugas_keluar"] = clean_text(slot.get("petugas_keluar"))
     st.session_state["atas_izin"] = clean_text(slot.get("atas_izin"))
     st.session_state["notes"] = clean_text(slot.get("notes"))
+    st.session_state["_editor_slot_no"] = slot_no
+    st.session_state["_pending_editor_sync"] = False
 
 
 def sync_report_from_widgets():
@@ -427,7 +450,7 @@ def apply_quick_action(action):
             return
         slot["status_enum"] = "TIDAK_DIPAKAI"
 
-    sync_widgets_from_report()
+    st.session_state["_pending_editor_sync"] = True
     save_draft()
 
 
@@ -594,6 +617,48 @@ def passive_slot_text(slot):
     return slot_state_label(slot)
 
 
+def summary_item_markup(slot, emphasize_action=False):
+    title = f"No.{slot['slot_no']} | {product_label(slot)}"
+    shift_line = slot_update_type(slot)
+    timing = elapsed_or_remaining(slot)
+    context = action_priority_text(slot) if emphasize_action else short_context_text(slot)
+    action_badge = ""
+    if emphasize_action and current_action_type(slot):
+        action_badge = f'<div class="sd-mini-badge">{html.escape(action_type_badge(slot))}</div>'
+    state_line = ""
+    if slot.get("partial_out"):
+        state_line = '<div class="sd-mini-state">SEBAGIAN KELUAR, SISA MASIH DRY</div>'
+    return (
+        '<div class="sd-mini-card">'
+        f"{action_badge}"
+        f'<div class="sd-mini-title">{html.escape(title)}</div>'
+        f'<div class="sd-mini-meta">{html.escape(shift_line)}</div>'
+        f'<div class="sd-mini-time">{html.escape(timing)}</div>'
+        f"{state_line}"
+        f'<div class="sd-mini-action">{html.escape(context)}</div>'
+        "</div>"
+    )
+
+
+def board_card_markup(slot):
+    product = product_label(slot)
+    state = slot_state_label(slot)
+    timing = elapsed_or_remaining(slot)
+    check_now = action_priority_text(slot) if current_action_type(slot) else short_context_text(slot)
+    tone = " action" if current_action_type(slot) else (" passive" if slot_group(slot) != "active" else "")
+    badge = action_type_badge(slot) if current_action_type(slot) else slot_group_label(slot)
+    return (
+        f'<div class="sd-board-card{tone}">'
+        f'<div class="sd-board-badge">{html.escape(badge)}</div>'
+        f'<div class="sd-board-slot">No.{slot["slot_no"]}</div>'
+        f'<div class="sd-board-product">{html.escape(product if product != "-" else "Belum ada produk")}</div>'
+        f'<div class="sd-board-state">{html.escape(state)}</div>'
+        f'<div class="sd-board-time">{html.escape(timing)}</div>'
+        f'<div class="sd-board-check">{html.escape(check_now)}</div>'
+        "</div>"
+    )
+
+
 def quick_action_primary(slot):
     status = slot.get("status_enum")
     if status == "KOSONG":
@@ -710,7 +775,7 @@ def submit_report():
 
 def select_slot(slot_no: int):
     st.session_state["report"]["selected_slot"] = slot_no
-    sync_widgets_from_report()
+    st.session_state["_pending_editor_sync"] = True
 
 
 def render_summary():
@@ -720,90 +785,94 @@ def render_summary():
     nonactive_slots = [slot for slot in slots if slot_group(slot) == "nonactive"]
     broken_slots = [slot for slot in slots if slot_group(slot) == "broken"]
 
+    st.markdown("### Ringkasan cepat")
+
     with st.container(border=True):
-        st.caption("PERLU AKSI")
-        st.subheader(str(len(action_slots)))
+        st.markdown(
+            f'<div class="sd-section-head strong"><span>PERLU AKSI</span><strong>{len(action_slots)}</strong></div>',
+            unsafe_allow_html=True,
+        )
         if action_slots:
-            for slot in action_slots[:4]:
-                st.markdown(
-                    f"**{action_type_badge(slot)}**  \n"
-                    f"No.{slot['slot_no']} | {product_label(slot)}  \n"
-                    f"{elapsed_or_remaining(slot)}  \n"
-                    f"{action_priority_text(slot)}"
-                )
-                if slot.get("partial_out"):
-                    st.caption("SEBAGIAN KELUAR, SISA MASIH DRY")
+            st.markdown(
+                "".join(summary_item_markup(slot, emphasize_action=True) for slot in action_slots[:4]),
+                unsafe_allow_html=True,
+            )
+            if len(action_slots) > 4:
+                st.caption(f"+{len(action_slots) - 4} slot lain perlu dicek")
         else:
             st.caption("Belum ada slot yang perlu dicek sekarang.")
 
     with st.container(border=True):
-        st.caption("SLOT AKTIF")
-        st.subheader(str(len(active_slots)))
+        st.markdown(
+            f'<div class="sd-section-head"><span>SLOT AKTIF</span><strong>{len(active_slots)}</strong></div>',
+            unsafe_allow_html=True,
+        )
         if active_slots:
-            for slot in active_slots[:4]:
-                st.markdown(
-                    f"**No.{slot['slot_no']} | {product_label(slot)}**  \n"
-                    f"{slot_state_label(slot)}  \n"
-                    f"{elapsed_or_remaining(slot)}"
-                )
+            st.markdown(
+                "".join(summary_item_markup(slot, emphasize_action=False) for slot in active_slots[:4]),
+                unsafe_allow_html=True,
+            )
             if len(active_slots) > 4:
                 st.caption(f"+{len(active_slots) - 4} slot aktif lain")
         else:
-            st.caption("Tidak ada slot aktif lain di luar area perlu aksi.")
+            st.caption("Tidak ada slot aktif lain.")
 
-    st.caption(
-        f"KOSONG ({len(nonactive_slots)}): {compact_slot_list(nonactive_slots)} | "
-        f"TIDAK DIPAKAI ({len(broken_slots)}): {compact_slot_list(broken_slots)}"
+    st.markdown(
+        f"""
+        <div class="sd-passive-bar">
+          <div><strong>KOSONG ({len(nonactive_slots)})</strong><span>{html.escape(compact_slot_list(nonactive_slots))}</span></div>
+          <div><strong>TIDAK DIPAKAI ({len(broken_slots)})</strong><span>{html.escape(compact_slot_list(broken_slots))}</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 
 def render_board():
-    st.subheader("Papan slot dry")
+    st.markdown("### Papan slot dry")
     slots = st.session_state["report"]["slots"]
-    active_slots = [slot for slot in slots if slot_group(slot) == "active"]
-    passive_slots = [slot for slot in slots if slot_group(slot) != "active"]
-
+    ordered_slots = sorted(
+        slots,
+        key=lambda slot: (
+            0 if current_action_type(slot) else 1,
+            0 if slot_group(slot) == "active" else 1,
+            slot["slot_no"],
+        ),
+    )
     cols = st.columns(2)
-    for idx, slot in enumerate(active_slots):
+    for idx, slot in enumerate(ordered_slots):
         with cols[idx % 2]:
             with st.container(border=True):
-                st.markdown(f"**No.{slot['slot_no']}**")
-                st.markdown(f"**{(product_label(slot) if product_label(slot) != '-' else 'Belum ada produk').upper()}**")
-                st.caption(slot_state_label(slot))
-                st.caption(elapsed_or_remaining(slot))
-                if current_action_type(slot):
-                    st.warning(action_priority_text(slot))
+                st.markdown(board_card_markup(slot), unsafe_allow_html=True)
                 if st.button(f"Buka No.{slot['slot_no']}", key=f"slot_btn_{slot['slot_no']}", use_container_width=True):
-                    select_slot(slot["slot_no"])
-                    st.rerun()
-
-    if passive_slots:
-        st.caption("Slot pasif")
-        passive_cols = st.columns(3)
-        for idx, slot in enumerate(passive_slots):
-            with passive_cols[idx % 3]:
-                st.caption(f"No.{slot['slot_no']} | {passive_slot_text(slot)}")
-                if st.button(f"Pilih No.{slot['slot_no']}", key=f"passive_slot_btn_{slot['slot_no']}", use_container_width=True):
                     select_slot(slot["slot_no"])
                     st.rerun()
 
 
 def render_detail():
+    sync_editor_widgets_from_selected_slot()
     report = st.session_state["report"]
     slot = report["slots"][report["selected_slot"] - 1]
-    st.subheader(f"Detail Slot No.{slot['slot_no']}")
-    st.caption(f"{slot_state_label(slot)} | {slot_update_type(slot)}")
+    st.markdown("### Detail slot")
+    st.markdown(
+        f"""
+        <div class="sd-detail-head">
+          <strong>No.{slot['slot_no']} | {html.escape(product_label(slot))}</strong>
+          <span>{html.escape(slot_state_label(slot))}</span>
+          <span>{html.escape(slot_update_type(slot))}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     actions = visible_quick_actions(slot)
     if actions:
-        action_cols = st.columns(len(actions))
+        action_cols = st.columns(max(1, len(actions)))
         for idx, action in enumerate(actions):
             with action_cols[idx]:
                 if st.button(quick_action_label(action), key=f"qa_{action}", type="primary", use_container_width=True):
                     apply_quick_action(action)
                     st.rerun()
-    else:
-        st.caption("Tidak ada aksi cepat untuk slot ini.")
 
     danger_actions = available_danger_actions(slot)
     if danger_actions:
@@ -852,46 +921,35 @@ def render_detail():
 
 
 def render_header_controls(server_state):
-    st.title("Status Dry")
+    st.markdown("## Status Dry")
     st.caption("Lanjutkan status sebelumnya, lalu ubah hanya slot yang benar-benar berubah.")
     security = server_state.get("security", {})
     if security.get("app_locked"):
         st.error(security.get("reason") or "Aplikasi terkunci.")
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.date_input("Tgl Produksi", key="work_date")
-    with col2:
-        st.selectbox("Shift", ["Shift 1", "Shift 2", "Shift 3"], key="shift")
-    with col3:
-        st.text_input("Pelapor", key="lock_owner")
+    with st.container(border=True):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.date_input("Tgl Produksi", key="work_date")
+        with col2:
+            st.selectbox("Shift", ["Shift 1", "Shift 2", "Shift 3"], key="shift")
+        with col3:
+            st.text_input("Pelapor", key="lock_owner")
 
-    st.text_input("Anggota Tim", key="members", help="Pisahkan dengan koma")
-    row1, row2 = st.columns(2)
-    with row1:
-        st.text_input("Tim Berikutnya / Handover", key="team_finish")
-    with row2:
-        st.text_input("Jam Handover", key="handover_time", placeholder="HH:mm")
+        with st.expander("Info tim tambahan (opsional)", expanded=False):
+            st.text_input("Anggota Tim", key="members", help="Pisahkan dengan koma")
+            row1, row2 = st.columns(2)
+            with row1:
+                st.text_input("Tim Berikutnya / Handover", key="team_finish")
+            with row2:
+                st.text_input("Jam Handover", key="handover_time", placeholder="HH:mm")
 
-    controls = st.columns(2)
-    with controls[0]:
         if st.button("Buka Tim", use_container_width=True):
             try:
                 open_team(False)
                 st.rerun()
             except Exception as err:
                 set_feedback(str(err), ok=False)
-    with controls[1]:
-        if st.button("Ambil Alih", use_container_width=True):
-            try:
-                open_team(True)
-                st.rerun()
-            except Exception as err:
-                set_feedback(str(err), ok=False)
-
-    lock = st.session_state.get("lock") or {}
-    if lock:
-        st.caption(f"Lock aktif: {lock.get('lockOwner')}")
 
 
 def render_feedback():
@@ -921,8 +979,170 @@ def main():
     st.markdown(
         """
         <style>
-        .stButton button { min-height: 44px; }
+        .block-container {
+          max-width: 980px;
+          padding-top: 1.2rem;
+          padding-bottom: 3rem;
+        }
+        .stButton button {
+          min-height: 46px;
+          border-radius: 12px;
+          font-weight: 700;
+        }
         .stCaption { line-height: 1.35; }
+        .sd-section-head {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+        .sd-section-head span {
+          font-size: 0.88rem;
+          font-weight: 800;
+          color: #516377;
+        }
+        .sd-section-head strong {
+          font-size: 1.2rem;
+          color: #142132;
+        }
+        .sd-section-head.strong strong { color: #8d6200; }
+        .sd-mini-card {
+          border: 1px solid #d8e2eb;
+          border-radius: 14px;
+          background: #fbfdff;
+          padding: 10px 11px;
+          margin-top: 8px;
+        }
+        .sd-mini-title {
+          font-size: 0.98rem;
+          font-weight: 800;
+          color: #142132;
+        }
+        .sd-mini-meta, .sd-mini-time {
+          margin-top: 4px;
+          font-size: 0.84rem;
+          color: #526476;
+        }
+        .sd-mini-action {
+          margin-top: 6px;
+          font-size: 0.88rem;
+          font-weight: 700;
+          color: #6c4b00;
+        }
+        .sd-mini-badge {
+          display: inline-block;
+          margin-bottom: 6px;
+          padding: 3px 8px;
+          border-radius: 999px;
+          background: #fff3d6;
+          border: 1px solid #ebcd88;
+          color: #7d5500;
+          font-size: 0.72rem;
+          font-weight: 900;
+        }
+        .sd-mini-state {
+          margin-top: 6px;
+          font-size: 0.78rem;
+          font-weight: 800;
+          color: #0f6c5a;
+        }
+        .sd-passive-bar {
+          display: grid;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        .sd-passive-bar > div {
+          display: flex;
+          align-items: baseline;
+          gap: 8px;
+          border: 1px solid #dbe3ea;
+          border-radius: 11px;
+          padding: 8px 10px;
+          background: #f8fbfd;
+          font-size: 0.84rem;
+        }
+        .sd-passive-bar strong {
+          flex: 0 0 auto;
+          color: #334456;
+        }
+        .sd-passive-bar span {
+          color: #596b7d;
+          font-weight: 700;
+        }
+        .sd-board-card {
+          border-left: 5px solid #2a70d1;
+          border-radius: 14px;
+          background: #ffffff;
+          padding: 10px 12px 8px;
+          margin-bottom: 10px;
+          box-shadow: inset 0 0 0 1px #d7e1eb;
+        }
+        .sd-board-card.action {
+          border-left-color: #d79a05;
+          box-shadow: inset 0 0 0 2px #f0c456;
+        }
+        .sd-board-card.passive {
+          border-left-color: #a1adba;
+          background: #f9fbfd;
+        }
+        .sd-board-badge {
+          display: inline-block;
+          padding: 3px 8px;
+          border-radius: 999px;
+          font-size: 0.72rem;
+          font-weight: 900;
+          background: #eef4fb;
+          color: #39577a;
+          border: 1px solid #d4dfea;
+        }
+        .sd-board-card.action .sd-board-badge {
+          background: #fff3d6;
+          color: #7d5500;
+          border-color: #ebcd88;
+        }
+        .sd-board-slot {
+          margin-top: 9px;
+          font-size: 1.1rem;
+          font-weight: 900;
+          color: #142132;
+        }
+        .sd-board-product {
+          margin-top: 6px;
+          font-size: 1rem;
+          font-weight: 800;
+          color: #142132;
+        }
+        .sd-board-state {
+          margin-top: 7px;
+          font-size: 0.88rem;
+          font-weight: 800;
+          color: #24435e;
+        }
+        .sd-board-time {
+          margin-top: 4px;
+          font-size: 0.84rem;
+          color: #536476;
+        }
+        .sd-board-check {
+          margin-top: 7px;
+          font-size: 0.86rem;
+          font-weight: 700;
+          color: #6c4b00;
+        }
+        .sd-detail-head {
+          display: grid;
+          gap: 4px;
+          margin-bottom: 10px;
+        }
+        .sd-detail-head strong {
+          font-size: 1rem;
+          color: #142132;
+        }
+        .sd-detail-head span {
+          font-size: 0.85rem;
+          color: #536476;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -939,6 +1159,7 @@ def main():
         return
 
     ensure_app_state()
+    sync_header_widgets_from_report()
     server_state = get_state()
     sync_lock_from_server(server_state)
 
