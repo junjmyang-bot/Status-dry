@@ -590,6 +590,10 @@ def short_context_text(slot):
     return slot_state_label(slot)
 
 
+def passive_slot_text(slot):
+    return slot_state_label(slot)
+
+
 def quick_action_primary(slot):
     status = slot.get("status_enum")
     if status == "KOSONG":
@@ -711,59 +715,56 @@ def select_slot(slot_no: int):
 
 def render_summary():
     slots = st.session_state["report"]["slots"]
-    groups = {
-        "active": [slot for slot in slots if slot_group(slot) == "active"],
-        "action": [slot for slot in slots if current_action_type(slot)],
-        "nonactive": [slot for slot in slots if slot_group(slot) == "nonactive"],
-        "broken": [slot for slot in slots if slot_group(slot) == "broken"],
-    }
+    action_slots = [slot for slot in slots if current_action_type(slot)]
+    active_slots = [slot for slot in slots if slot_group(slot) == "active" and not current_action_type(slot)]
+    nonactive_slots = [slot for slot in slots if slot_group(slot) == "nonactive"]
+    broken_slots = [slot for slot in slots if slot_group(slot) == "broken"]
 
-    col1, col2 = st.columns(2)
-    with col1:
-        with st.container(border=True):
-            st.caption("PERLU AKSI")
-            st.subheader(str(len(groups["action"])))
-            if groups["action"]:
-                for slot in groups["action"][:3]:
-                    st.markdown(
-                        f"**No.{slot['slot_no']} | {product_label(slot)}**  \n"
-                        f"**{action_type_badge(slot)}**  \n"
-                        f"{elapsed_or_remaining(slot)}  \n"
-                        f"{action_priority_text(slot)}"
-                    )
-                    if slot.get("partial_out"):
-                        st.caption("SEBAGIAN KELUAR, SISA MASIH DRY")
-                if len(groups["action"]) > 3:
-                    st.caption(f"+{len(groups['action']) - 3} slot lain")
-            else:
-                st.write("-")
-    with col2:
-        with st.container(border=True):
-            st.caption("SLOT AKTIF")
-            st.subheader(str(len(groups["active"])))
-            if groups["active"]:
-                for slot in groups["active"][:3]:
-                    st.markdown(
-                        f"**No.{slot['slot_no']} | {product_label(slot)}**  \n"
-                        f"{elapsed_or_remaining(slot)}  \n"
-                        f"{short_context_text(slot)}"
-                    )
-                if len(groups["active"]) > 3:
-                    st.caption(f"+{len(groups['active']) - 3} slot lain")
-            else:
-                st.write("-")
+    with st.container(border=True):
+        st.caption("PERLU AKSI")
+        st.subheader(str(len(action_slots)))
+        if action_slots:
+            for slot in action_slots[:4]:
+                st.markdown(
+                    f"**{action_type_badge(slot)}**  \n"
+                    f"No.{slot['slot_no']} | {product_label(slot)}  \n"
+                    f"{elapsed_or_remaining(slot)}  \n"
+                    f"{action_priority_text(slot)}"
+                )
+                if slot.get("partial_out"):
+                    st.caption("SEBAGIAN KELUAR, SISA MASIH DRY")
+        else:
+            st.caption("Belum ada slot yang perlu dicek sekarang.")
+
+    with st.container(border=True):
+        st.caption("SLOT AKTIF")
+        st.subheader(str(len(active_slots)))
+        if active_slots:
+            for slot in active_slots[:4]:
+                st.markdown(
+                    f"**No.{slot['slot_no']} | {product_label(slot)}**  \n"
+                    f"{slot_state_label(slot)}  \n"
+                    f"{elapsed_or_remaining(slot)}"
+                )
+            if len(active_slots) > 4:
+                st.caption(f"+{len(active_slots) - 4} slot aktif lain")
+        else:
+            st.caption("Tidak ada slot aktif lain di luar area perlu aksi.")
 
     st.caption(
-        f"KOSONG ({len(groups['nonactive'])}): {compact_slot_list(groups['nonactive'])} | "
-        f"TIDAK DIPAKAI ({len(groups['broken'])}): {compact_slot_list(groups['broken'])}"
+        f"KOSONG ({len(nonactive_slots)}): {compact_slot_list(nonactive_slots)} | "
+        f"TIDAK DIPAKAI ({len(broken_slots)}): {compact_slot_list(broken_slots)}"
     )
 
 
 def render_board():
     st.subheader("Papan slot dry")
     slots = st.session_state["report"]["slots"]
+    active_slots = [slot for slot in slots if slot_group(slot) == "active"]
+    passive_slots = [slot for slot in slots if slot_group(slot) != "active"]
+
     cols = st.columns(2)
-    for idx, slot in enumerate(slots):
+    for idx, slot in enumerate(active_slots):
         with cols[idx % 2]:
             with st.container(border=True):
                 st.markdown(f"**No.{slot['slot_no']}**")
@@ -773,6 +774,16 @@ def render_board():
                 if current_action_type(slot):
                     st.warning(action_priority_text(slot))
                 if st.button(f"Buka No.{slot['slot_no']}", key=f"slot_btn_{slot['slot_no']}", use_container_width=True):
+                    select_slot(slot["slot_no"])
+                    st.rerun()
+
+    if passive_slots:
+        st.caption("Slot pasif")
+        passive_cols = st.columns(3)
+        for idx, slot in enumerate(passive_slots):
+            with passive_cols[idx % 3]:
+                st.caption(f"No.{slot['slot_no']} | {passive_slot_text(slot)}")
+                if st.button(f"Pilih No.{slot['slot_no']}", key=f"passive_slot_btn_{slot['slot_no']}", use_container_width=True):
                     select_slot(slot["slot_no"])
                     st.rerun()
 
@@ -842,6 +853,7 @@ def render_detail():
 
 def render_header_controls(server_state):
     st.title("Status Dry")
+    st.caption("Lanjutkan status sebelumnya, lalu ubah hanya slot yang benar-benar berubah.")
     security = server_state.get("security", {})
     if security.get("app_locked"):
         st.error(security.get("reason") or "Aplikasi terkunci.")
