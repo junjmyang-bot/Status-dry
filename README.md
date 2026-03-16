@@ -25,54 +25,45 @@ Required:
 Optional:
 - `APP_TIMEZONE` (default `Asia/Jakarta`)
 
-## Direct operator deployment
-The correct operator-facing deployment is the Node app itself, not the Streamlit launcher.
+## Streamlit operator deployment
+The operator-facing app is now `streamlit_app.py`.
 
-Recommended target:
-- Render Web Service
+Deployment target:
+- Streamlit Community Cloud
 
-Minimum app settings:
-- Runtime: `Node`
-- Build command: `npm install`
-- Start command: `npm start`
-- Health check path: `/api/state`
+Required files already included:
+- `streamlit_app.py`
+- `requirements.txt`
+- `packages.txt`
+- `.streamlit/config.toml`
 
-Required env vars:
+How it works:
+- Streamlit is the main operator UI
+- `streamlit_app.py` starts `src/server.js` internally on localhost
+- operators do not open a separate localhost page; they work directly inside Streamlit
+
+Streamlit app settings:
+- Main file path: `streamlit_app.py`
+- Python version: `3.11` or newer
+
+Required Streamlit secrets:
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 - `SHEETS_WEBHOOK_URL`
 
-Recommended persistent storage env vars:
-- `PENDING_QUEUE_FILE=/var/data/pending-queue.json`
-- `ROOT_MESSAGE_FILE=/var/data/root-messages.json`
-- `TEAM_LOCK_FILE=/var/data/team-locks.json`
-- `TIME_INTEGRITY_FILE=/var/data/time-integrity.json`
+Optional secret:
+- `APP_TIMEZONE=Asia/Jakarta`
 
-This repo includes:
-- `package.json` for Node deployment
-- `render.yaml` for Render blueprint deployment
+Notes:
+- `packages.txt` installs `nodejs` so Streamlit can start the internal backend
+- the backend remains local to the Streamlit runtime and is not an operator-facing URL
+- draft data is stored in `storage/streamlit-operator-draft.json`
 
-## Streamlit launcher
-This repo now includes a minimal Streamlit launcher:
+## Optional direct Node deployment
+This repo still includes direct Node deployment files if needed for backend-only testing or alternative hosting:
 
-- main file: `streamlit_app.py`
-- python deps: `requirements.txt`
-- system package for runtime: `packages.txt`
-
-If you connect this repo to Streamlit:
-
-1. set app entrypoint to `streamlit_app.py`
-2. add these secrets in Streamlit:
-   - `TELEGRAM_BOT_TOKEN`
-   - `TELEGRAM_CHAT_ID`
-   - `SHEETS_WEBHOOK_URL`
-   - `PUBLIC_APP_URL`
-3. keep using `src/server.js` as the real dry app backend
-
-Note:
-- current UI is still a Node app
-- Streamlit here is a launcher/diagnostic wrapper, not a rewrite of the dry app UI
-- if `PUBLIC_APP_URL` is set, the operator button opens that public URL instead of localhost
+- `package.json`
+- `render.yaml`
 
 ## CLI usage
 ### 1) Open Team
