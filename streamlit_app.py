@@ -577,6 +577,19 @@ def compact_slot_list(slots):
     return ", ".join(labels)
 
 
+def product_label(slot):
+    return clean_text(slot.get("status_isi")) or "-"
+
+
+def short_context_text(slot):
+    if slot.get("partial_out"):
+        return "Sebagian keluar"
+    action = current_action_type(slot)
+    if action:
+        return action_priority_text(slot)
+    return slot_state_label(slot)
+
+
 def quick_action_primary(slot):
     status = slot.get("status_enum")
     if status == "KOSONG":
@@ -708,31 +721,13 @@ def render_summary():
     col1, col2 = st.columns(2)
     with col1:
         with st.container(border=True):
-            st.caption("SLOT AKTIF")
-            st.subheader(str(len(groups["active"])))
-            if groups["active"]:
-                for slot in groups["active"][:3]:
-                    st.markdown(
-                        f"**No.{slot['slot_no']} | {clean_text(slot.get('status_isi')) or '-'}**  \n"
-                        f"{slot_update_type(slot)}  \n"
-                        f"{elapsed_or_remaining(slot)}  \n"
-                        f"{action_priority_text(slot)}"
-                    )
-                if len(groups["active"]) > 3:
-                    st.caption(f"+{len(groups['active']) - 3} slot lain")
-            else:
-                st.write("-")
-    with col2:
-        with st.container(border=True):
             st.caption("PERLU AKSI")
             st.subheader(str(len(groups["action"])))
             if groups["action"]:
                 for slot in groups["action"][:3]:
-                    badge = action_type_badge(slot)
                     st.markdown(
-                        f"**No.{slot['slot_no']} | {clean_text(slot.get('status_isi')) or '-'}**  \n"
-                        f"{badge}  \n"
-                        f"{slot_update_type(slot)}  \n"
+                        f"**No.{slot['slot_no']} | {product_label(slot)}**  \n"
+                        f"**{action_type_badge(slot)}**  \n"
                         f"{elapsed_or_remaining(slot)}  \n"
                         f"{action_priority_text(slot)}"
                     )
@@ -742,10 +737,25 @@ def render_summary():
                     st.caption(f"+{len(groups['action']) - 3} slot lain")
             else:
                 st.write("-")
+    with col2:
+        with st.container(border=True):
+            st.caption("SLOT AKTIF")
+            st.subheader(str(len(groups["active"])))
+            if groups["active"]:
+                for slot in groups["active"][:3]:
+                    st.markdown(
+                        f"**No.{slot['slot_no']} | {product_label(slot)}**  \n"
+                        f"{elapsed_or_remaining(slot)}  \n"
+                        f"{short_context_text(slot)}"
+                    )
+                if len(groups["active"]) > 3:
+                    st.caption(f"+{len(groups['active']) - 3} slot lain")
+            else:
+                st.write("-")
 
-    st.markdown(
-        f"**KOSONG:** {compact_slot_list(groups['nonactive'])}  \n"
-        f"**TIDAK DIPAKAI:** {compact_slot_list(groups['broken'])}"
+    st.caption(
+        f"KOSONG ({len(groups['nonactive'])}): {compact_slot_list(groups['nonactive'])} | "
+        f"TIDAK DIPAKAI ({len(groups['broken'])}): {compact_slot_list(groups['broken'])}"
     )
 
 
@@ -757,11 +767,11 @@ def render_board():
         with cols[idx % 2]:
             with st.container(border=True):
                 st.markdown(f"**No.{slot['slot_no']}**")
-                st.markdown(f"**{(clean_text(slot.get('status_isi')) or 'Belum ada produk').upper()}**")
+                st.markdown(f"**{(product_label(slot) if product_label(slot) != '-' else 'Belum ada produk').upper()}**")
                 st.caption(slot_state_label(slot))
                 st.caption(elapsed_or_remaining(slot))
                 if current_action_type(slot):
-                    st.warning(action_priority_text(slot), icon="!")
+                    st.warning(action_priority_text(slot))
                 if st.button(f"Buka No.{slot['slot_no']}", key=f"slot_btn_{slot['slot_no']}", use_container_width=True):
                     select_slot(slot["slot_no"])
                     st.rerun()
@@ -806,7 +816,7 @@ def render_detail():
             else:
                 st.info("Jalur slot ini tanpa defrost.")
         if slot.get("partial_out"):
-            st.warning("SEBAGIAN KELUAR, SISA MASIH DRY", icon="!")
+            st.warning("SEBAGIAN KELUAR, SISA MASIH DRY")
 
     with st.expander("Catatan waktu / detail record", expanded=True):
         st.caption("Bagian ini untuk melengkapi catatan. Status papan tetap mengikuti aksi cepat atau koreksi status manual.")
