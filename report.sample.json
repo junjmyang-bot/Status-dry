@@ -1,0 +1,48 @@
+{
+  "report_meta": {
+    "report_type": "dry_status",
+    "prd_date": "2026-03-05",
+    "timezone": "Asia/Jakarta",
+    "team_start": {
+      "label": "Aris&Fauzan",
+      "shift": "Shift 1",
+      "members": ["Aris", "Fauzan"]
+    },
+    "team_finish": null,
+    "submitted_at_system": "2026-03-05T14:40:00+07:00"
+  },
+  "slots": [
+    {
+      "slot_no": 2,
+      "status_enum": "SIAP_TURUN",
+      "jam_masuk": "14:00",
+      "jam_estimasi_keluar": "14:30",
+      "jam_selesai_dry": "14:30",
+      "petugas_masuk": "Fauzan",
+      "status_isi": "dry ulang pp bar & is",
+      "atas_izin": "Aris"
+    },
+    {
+      "slot_no": 3,
+      "status_enum": "PROSES",
+      "jam_masuk": "10:56",
+      "jam_estimasi_keluar": "16:56",
+      "petugas_masuk": "Fauzan",
+      "status_isi": "is",
+      "atas_izin": "Aris",
+      "notes": "kurang 3 jam"
+    },
+    {
+      "slot_no": 6,
+      "status_enum": "SELESAI_DRY",
+      "jam_masuk": "01.17",
+      "jam_defros": "00.47",
+      "jam_estimasi_keluar": "11.17",
+      "jam_selesai_dry": "10:20",
+      "petugas_masuk": "Alnedy",
+      "status_isi": "pp bar",
+      "atas_izin": "Ade",
+      "notes": "prod shift 2"
+    }
+  ]
+}

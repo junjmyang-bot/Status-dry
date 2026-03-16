@@ -1,0 +1,2036 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Board Status Dry</title>
+<style>
+:root {
+  --bg: #edf3f8;
+  --card: #ffffff;
+  --ink: #16202a;
+  --muted: #5f6974;
+  --line: #d6e0ea;
+  --btn: #0f5f82;
+  --btn2: #0b7f7a;
+  --ok: #0f7c3d;
+  --bad: #ad2f28;
+  --state-active: #246fcb;
+  --state-nonactive: #8b97a3;
+  --state-broken: #5f6974;
+  --state-action: #d89a00;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: radial-gradient(circle at 14% 0%, #f8fbff, #e5edf5 62%, #dce6f0);
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  color: var(--ink);
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 12px; }
+.header h1 { margin: 0; font-size: 22px; }
+.header p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.stack { display: grid; gap: 10px; margin-top: 10px; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+}
+.card h2 { margin: 0 0 8px; font-size: 15px; }
+.field { margin-top: 7px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.field-note { margin-top: 6px; font-size: 11px; color: #5a6a79; }
+.workflow-box {
+  margin-top: 8px;
+  border: 1px solid #d6e0ea;
+  border-radius: 11px;
+  padding: 8px;
+  background: #f8fbfe;
+}
+.workflow-box strong {
+  display: block;
+  font-size: 13px;
+}
+.workflow-box span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #536476;
+}
+.rule-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #475a6c;
+  border: 1px dashed #d4e0ea;
+  border-radius: 9px;
+  padding: 7px 8px;
+  background: #fbfdff;
+}
+label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--muted); }
+input, select, button, textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+  background: #fff;
+}
+button {
+  border: 0;
+  color: #fff;
+  font-weight: 700;
+  min-height: 44px;
+  background: linear-gradient(125deg, var(--btn), var(--btn2));
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.18);
+}
+button.secondary { background: #5d6e82; }
+button.ghost { background: #7a8ea3; min-height: 34px; font-size: 12px; }
+button.recommend { box-shadow: 0 0 0 2px #113b59 inset; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #f3f7fb;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.chip.ok { color: var(--ok); border-color: #98d4ae; background: #ecf9f1; }
+.chip.bad { color: var(--bad); border-color: #ebb0ac; background: #fff1f0; }
+.summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.summary { border: 1px solid var(--line); border-radius: 9px; padding: 7px; font-size: 12px; }
+.summary-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.summary-head b { font-size: 13px; }
+.summary-slots {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4a5d70;
+  line-height: 1.35;
+}
+.summary-mini-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 6px;
+}
+.summary-mini {
+  border: 1px solid #d6e0ea;
+  border-radius: 9px;
+  background: rgba(255,255,255,0.7);
+  padding: 6px;
+}
+.summary-mini strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+}
+.summary-mini span {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #54677a;
+  line-height: 1.3;
+}
+.summary-mini-action {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #8b5a00;
+}
+.summary-mini-kind {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid #efcf8a;
+  background: #fff4d9;
+  color: #8b5a00;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+.summary-mini-state {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #24435e;
+}
+.summary-more {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #5b6c7c;
+}
+.summary-passive-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+.summary-passive {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: #536475;
+  border: 1px solid #d7e0e8;
+  border-radius: 9px;
+  background: #f7fafc;
+}
+.summary-passive strong {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 800;
+  color: #344658;
+}
+.summary-passive span {
+  min-width: 0;
+  line-height: 1.35;
+  font-weight: 700;
+}
+.summary-block-title {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #4f6172;
+}
+.live-dry-list { display: grid; gap: 6px; }
+.live-dry-item {
+  border: 1px solid #d7e2eb;
+  border-radius: 10px;
+  background: #fbfdff;
+  padding: 8px;
+  font-size: 12px;
+}
+.live-dry-item b { font-size: 13px; }
+.live-dry-meta {
+  margin-top: 4px;
+  color: #526476;
+}
+.live-dry-empty {
+  border: 1px dashed #d7e2eb;
+  border-radius: 10px;
+  background: #fbfdff;
+  padding: 8px;
+  font-size: 12px;
+  color: #5b6c7c;
+}
+.focus-list { display: grid; gap: 6px; margin-top: 8px; }
+.focus-item {
+  width: 100%;
+  text-align: left;
+  color: var(--ink);
+  background: #fbfdff;
+  border: 1px solid #d7e2eb;
+  border-radius: 10px;
+  padding: 8px;
+}
+.focus-item strong {
+  display: block;
+  font-size: 14px;
+}
+.focus-item span {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: #55687a;
+}
+.focus-check {
+  margin-top: 5px;
+  font-weight: 700;
+  color: #8a5a00;
+}
+.summary.state-active { background: #eff6ff; border-color: #bfd6f4; }
+.summary.state-nonactive { background: #f4f7fa; border-color: #d7e0e8; }
+.summary.state-broken { background: #eef1f4; border-color: #cbd4dd; }
+.summary.state-action { background: #fff7e8; border-color: #efd29c; }
+.summary small { display: block; margin-top: 3px; color: #56687a; }
+.board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.slot-btn {
+  position: relative;
+  overflow: hidden;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: #fff;
+  text-align: left;
+  padding: 8px;
+  color: var(--ink);
+}
+.slot-btn.active { outline: 2px solid #123f62; }
+.slot-content { position: relative; z-index: 1; }
+.slot-btn.tidak-x {
+  background:
+    linear-gradient(135deg, rgba(125,135,147,0.12), rgba(125,135,147,0.04)),
+    repeating-linear-gradient(
+      135deg,
+      rgba(125,135,147,0.08) 0,
+      rgba(125,135,147,0.08) 8px,
+      rgba(255,255,255,0) 8px,
+      rgba(255,255,255,0) 16px
+    );
+}
+.slot-x-mark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 52px;
+  font-weight: 900;
+  color: rgba(88,99,112,0.16);
+  pointer-events: none;
+  z-index: 0;
+}
+.slot-x-label {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #6a7581;
+  background: rgba(255,255,255,0.85);
+  border: 1px solid #cfd8e1;
+  border-radius: 999px;
+  padding: 2px 6px;
+  pointer-events: none;
+  z-index: 1;
+}
+.slot-status-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 5px;
+  border: 1px solid #d0d9e2;
+}
+.badge-active { background: #eaf3ff; color: #1c65bb; }
+.badge-nonactive { background: #eef2f6; color: #5e6976; }
+.badge-broken { background: #edf0f4; color: #586370; }
+.badge-action { background: #fff7e3; color: #9e6e00; }
+.slot-no { font-weight: 900; font-size: 17px; line-height: 1.1; }
+.slot-main { font-size: 15px; margin-top: 4px; font-weight: 800; }
+.slot-sub { font-size: 12px; color: #35495c; margin-top: 5px; font-weight: 700; }
+.slot-phase { font-size: 12px; color: #223649; margin-top: 6px; font-weight: 800; }
+.slot-alert {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #8b5a00;
+  background: #fff4d9;
+  border: 1px solid #efcf8a;
+}
+.group-active { border-left: 6px solid var(--state-active); }
+.group-nonactive { border-left: 6px solid var(--state-nonactive); }
+.group-broken { border-left: 6px solid var(--state-broken); }
+.group-action {
+  border-left: 6px solid var(--state-action);
+  box-shadow: 0 0 0 2px #f1b24a inset;
+  background: linear-gradient(180deg, #fffdf8 0%, #ffffff 100%);
+}
+.slot-btn.group-action.active {
+  outline: 2px solid #8d5f0b;
+}
+.need-list { display: grid; gap: 6px; }
+.need-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: #fafcff;
+  cursor: pointer;
+  font-size: 12px;
+}
+.editor-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.editor-title h3 { margin: 0; font-size: 16px; }
+.editor-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #506173;
+  border: 1px dashed #d5e0ea;
+  border-radius: 9px;
+  padding: 6px;
+}
+.editor-change-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #0f5f82;
+  border: 1px solid #cfe0ee;
+  border-radius: 9px;
+  padding: 6px 8px;
+  background: #f7fbff;
+}
+.record-warning {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #8a5a00;
+  border: 1px solid #efd29c;
+  border-radius: 9px;
+  padding: 7px 8px;
+  background: #fff8e8;
+}
+.editor-status-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.editor-status-box {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: #fbfdff;
+}
+.editor-status-box span {
+  display: block;
+  font-size: 11px;
+  color: #5f6f7f;
+  margin-bottom: 3px;
+}
+.editor-status-box strong {
+  font-size: 13px;
+}
+.editor-status-box em {
+  display: block;
+  margin-top: 4px;
+  font-style: normal;
+  font-size: 11px;
+  color: #607081;
+}
+.slot-origin {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #607081;
+}
+.action-note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #5d6d7c;
+  border: 1px solid #d8e2eb;
+  border-radius: 9px;
+  padding: 7px 8px;
+  background: #f8fbfe;
+}
+.action-primary button {
+  min-height: 52px;
+  font-size: 15px;
+}
+.quick-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.quick-actions.secondary { margin-top: 7px; }
+.risk-box summary,
+.exception-box summary,
+.system-box summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+}
+.time-row { display: grid; grid-template-columns: 134px 1fr 88px; gap: 6px; }
+.locked { background: #eef3f8; color: #415264; }
+.result {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.submit-feedback {
+  margin-top: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.result.ok { border-color: #9ad5b0; background: #edf9f1; }
+.result.err { border-color: #ecb6b2; background: #fff1f0; }
+.ops {
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  font-size: 12px;
+  color: #566273;
+  white-space: pre-wrap;
+}
+details.admin summary { cursor: pointer; font-weight: 700; font-size: 13px; }
+.lock-box {
+  margin-top: 7px;
+  border: 1px solid #ecb6b2;
+  background: #fff1f0;
+  color: #7a1d18;
+  border-radius: 9px;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.system-box {
+  margin-top: 0;
+}
+@media (max-width: 760px) {
+  .grid2, .grid3, .summary-grid, .board, .quick-actions, .time-row, .editor-status-strip { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+  <div class="wrap">
+  <div class="header">
+    <h1>Board Status Dry</h1>
+    <p>Update cepat: cukup ubah slot yang memang berubah.</p>
+  </div>
+
+  <div class="stack">
+    <section class="card">
+      <h2>Info Laporan</h2>
+      <div class="chips">
+        <span id="chipDraft" class="chip">Draft lokal: belum ada</span>
+      </div>
+      <div id="lockBox" class="lock-box" style="display:none;"></div>
+
+      <div class="grid3" style="margin-top:8px;">
+        <div class="field"><label for="workDate">Tanggal Produksi</label><input id="workDate" type="date" value="2026-03-07" /></div>
+        <div class="field"><label for="shift">Shift</label><select id="shift"><option value="Shift 1">Shift 1</option><option value="Shift 2">Shift 2</option><option value="Shift 3">Shift 3</option></select></div>
+        <div class="field"><label for="lockOwner">Pelapor</label><input id="lockOwner" list="recentNameList" value="aris" /></div>
+      </div>
+      <div class="workflow-box">
+        <strong id="shiftWorkflowTitle">Mode kerja shift ini</strong>
+        <span id="shiftWorkflowText">Lanjutkan status sebelumnya lalu ubah hanya slot yang memang berubah.</span>
+      </div>
+      <div class="field-note">Tim pelapor adalah tim yang masuk lebih dulu. Info handover hanya diisi bila memang ada serah terima ke tim berikutnya.</div>
+
+      <details class="admin" style="margin-top:8px;">
+        <summary>Info tim tambahan (opsional)</summary>
+        <div class="grid2" style="margin-top:8px;">
+          <div class="field"><label for="members">Pelapor / Anggota Tim (pisahkan koma)</label><input id="members" value="Aris,Fauzan" /></div>
+          <div class="field"><label for="teamFinish">Tim Berikutnya / Handover</label><input id="teamFinish" value="" placeholder="isi bila ada serah terima" /></div>
+          <div class="field"><label for="handoverTime">Jam Handover</label><input id="handoverTime" placeholder="HH:mm" inputmode="numeric" maxlength="5" /></div>
+        </div>
+        <div style="margin-top:8px;"><button id="btnClearDraft" class="ghost">Hapus Draft Lokal</button></div>
+      </details>
+
+      <details class="admin" style="margin-top:8px;">
+        <summary>Kontrol Admin</summary>
+        <div class="grid2" style="margin-top:8px;">
+          <div class="field"><label for="teamId">Team ID</label><input id="teamId" value="dry-team-1" /></div>
+          <div class="field"><label for="lockToken">Lock Token</label><input id="lockToken" /></div>
+          <div class="field"><label for="expectedVersion">Versi</label><input id="expectedVersion" value="1" /></div>
+        </div>
+        <div class="grid2" style="margin-top:8px;">
+          <button id="btnOpen">Buka Tim</button>
+          <button id="btnTakeover" class="secondary">Ambil Alih Tim</button>
+        </div>
+        <div style="margin-top:8px;"><button id="btnRetry" class="secondary">Ulang Kirim Pending</button></div>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Ringkasan cepat</h2>
+      <div id="summaryGrid" class="summary-grid"></div>
+      <div id="summaryPassive" class="summary-passive-list"></div>
+    </section>
+
+    <section class="card">
+      <h2>Papan slot dry (11 slot)</h2>
+      <div id="slotBoard" class="board"></div>
+    </section>
+
+    <section class="card">
+      <div class="editor-title">
+        <h3 id="editorTitle">Detail Slot</h3>
+      </div>
+      <div id="editorHint" class="editor-hint"></div>
+      <div id="editorChangeNote" class="editor-change-note" style="display:none;"></div>
+      <div class="editor-status-strip" style="display:none;">
+        <div class="editor-status-box"><span>Status terbaca</span><strong id="detailCurrentState">-</strong><em id="detailUpdateType">-</em></div>
+        <div class="editor-status-box"><span>Saran aksi sistem</span><strong id="detailCurrentAction">Tidak ada</strong><em id="detailActionSource">-</em></div>
+      </div>
+
+      <div id="actionPrimaryBox" class="action-primary" style="margin-top:8px;">
+        <button id="actPrimary">Pilih slot untuk mulai</button>
+      </div>
+      <div id="actionSecondaryBox" class="quick-actions secondary">
+        <button id="actMasuk" class="ghost">Mulai Dry</button>
+        <button id="actDefros" class="ghost">Mulai Defrost</button>
+        <button id="actSelesai" class="ghost">Selesai Dry</button>
+        <button id="actTurun" class="ghost">Keluarkan ke Packing</button>
+      </div>
+      <div id="actionNote" class="action-note" style="display:none;"></div>
+
+      <details id="riskBox" class="admin risk-box" style="margin-top:8px;">
+        <summary>Aksi berisiko</summary>
+        <div class="quick-actions" style="margin-top:8px;">
+          <button id="actKosong" class="secondary">Set kosong</button>
+          <button id="actTidak" class="secondary">Set tidak dipakai</button>
+        </div>
+      </details>
+
+      <details class="admin" style="margin-top:8px;">
+        <summary>Koreksi status manual</summary>
+        <div class="field"><label for="statusEnum">Kondisi Slot</label><select id="statusEnum"></select></div>
+      </details>
+
+      <details id="slotInfoBox" class="admin" style="margin-top:8px;">
+        <summary>Info produk / rule</summary>
+        <div class="field"><label for="statusIsi">Produk di Slot</label><input id="statusIsi" placeholder="contoh: IS / PP BAR / UDANG MIX" /></div>
+        <div class="field"><label for="needsDefrost">Defrost Diperlukan?</label><select id="needsDefrost"><option value="yes">Ya, perlu defrost</option><option value="no">Tidak perlu defrost</option></select></div>
+        <div id="productRuleNote" class="rule-note"></div>
+      </details>
+
+      <details class="admin" style="margin-top:8px;">
+        <summary>Catatan waktu / detail record</summary>
+        <div class="field-note">Bagian ini untuk melengkapi catatan. Status papan tetap mengikuti tombol aksi cepat atau Koreksi status manual.</div>
+        <div id="recordWarning" class="record-warning" style="display:none;"></div>
+        <div class="field"><label>Jam Masuk</label><div class="time-row"><input id="tglMasuk" class="locked" type="date" disabled /><input id="jamMasuk" class="locked" readonly /><button id="nowMasuk" class="ghost">Now</button></div></div>
+        <div id="defrostRow" class="field"><label>Jam Defrost</label><div class="time-row"><input id="tglDefros" class="locked" type="date" disabled /><input id="jamDefros" class="locked" readonly /><button id="nowDefros" class="ghost">Now</button></div></div>
+        <div id="defrostEstimateRow" class="field"><label for="jamEstimasiDefrost">Estimasi Selesai Defrost</label><input id="jamEstimasiDefrost" placeholder="HH:mm" inputmode="numeric" maxlength="5" /></div>
+        <div class="field"><label for="jamEstimasi">Estimasi Keluar</label><input id="jamEstimasi" placeholder="HH:mm" inputmode="numeric" maxlength="5" /></div>
+        <div class="field"><label>Jam Selesai Dry</label><div class="time-row"><input id="tglSelesai" class="locked" type="date" disabled /><input id="jamSelesai" class="locked" readonly /><button id="nowSelesai" class="ghost">Now</button></div></div>
+        <div class="field"><label for="partialOut">Sebagian Keluar?</label><select id="partialOut"><option value="no">Tidak</option><option value="yes">Ya</option></select></div>
+        <div id="partialOutTimeRow" class="field"><label for="jamKeluarSebagian">Jam Keluar Sebagian</label><input id="jamKeluarSebagian" placeholder="HH:mm" inputmode="numeric" maxlength="5" /></div>
+        <div id="remainingEstimateRow" class="field"><label for="jamEstimasiSisa">Estimasi Selesai Sisa</label><input id="jamEstimasiSisa" placeholder="HH:mm" inputmode="numeric" maxlength="5" /></div>
+        <div class="field"><label>Jam Turun Packing</label><div class="time-row"><input id="tglTurun" class="locked" type="date" disabled /><input id="jamTurun" class="locked" readonly /><button id="nowTurun" class="ghost">Now</button></div></div>
+
+        <datalist id="recentNameList"></datalist>
+        <div class="field"><label for="petugasMasuk">Petugas Masuk</label><input id="petugasMasuk" list="recentNameList" placeholder="nama petugas, pisahkan dengan koma" /></div>
+        <div class="field"><label for="petugasKeluar">Petugas Keluar</label><input id="petugasKeluar" list="recentNameList" placeholder="nama petugas, pisahkan dengan koma" /></div>
+        <div class="field"><label for="atasIzin">Atas Izin</label><input id="atasIzin" list="recentNameList" placeholder="nama atasan/tl" /></div>
+        <div class="field"><label for="notes">Catatan</label><input id="notes" /></div>
+      </details>
+
+      <div class="field"><button id="btnSubmit">Kirim Update</button></div>
+      <div id="result" class="result submit-feedback" style="display:none;"></div>
+    </section>
+    <section class="card">
+      <details class="admin system-box">
+        <summary>Status Sistem (opsional)</summary>
+        <div class="chips" style="margin-top:8px;">
+          <span id="chipTelegram" class="chip bad">Telegram: belum siap</span>
+          <span id="chipSheets" class="chip bad">Sheets: belum siap</span>
+        </div>
+        <div id="ops" class="ops" style="margin-top:8px;">Memuat...</div>
+        <details id="exceptionBox" class="admin exception-box" style="margin-top:8px;">
+          <summary>Bantuan catatan / pengecualian</summary>
+          <div class="field"><label for="exceptionPreset">Tambahkan catatan cepat</label><select id="exceptionPreset"><option value="">Pilih bila ada catatan tambahan</option><option value="Waktu tidak tahu">Waktu tidak tahu</option><option value="Perlu cek shift sebelumnya">Perlu cek shift sebelumnya</option><option value="Status belum pasti">Status belum pasti</option><option value="Koreksi supervisor">Koreksi supervisor</option></select></div>
+          <div class="field-note">Pilihan ini akan ditambahkan ke kolom catatan tanpa mengubah alur submit.</div>
+          <div id="exceptionAck" class="field-note" style="display:none;"></div>
+        </details>
+      </details>
+    </section>
+  </div>
+</div>
+
+<script>
+const STATUS_META = {
+  KOSONG: { label: "Kosong", hint: "Slot ini kosong." },
+  TIDAK_DIPAKAI: { label: "Tidak dipakai", hint: "Slot ini tidak dipakai." },
+  PROSES: { label: "Sedang diproses", hint: "Produk masih dalam proses dry." },
+  SIAP_TURUN: { label: "Siap turun", hint: "Dry sudah selesai dan slot siap diturunkan ke packing." },
+  SELESAI_DRY: { label: "Selesai dry", hint: "Dry selesai, cek apakah sudah siap handover ke packing." },
+  TURUN_PACKING: { label: "Sudah turun ke packing", hint: "Proses slot ini sudah selesai." },
+  DRY_ULANG: { label: "Dry ulang", hint: "Slot ini masuk proses dry ulang." }
+};
+const STATUS_OPTIONS = Object.keys(STATUS_META);
+const PRODUCT_RULES = [
+  {
+    id: "dry_ulang",
+    match: /dry\s*ulang/i,
+    requiresDefrost: false,
+    recheckEveryMinutes: 15,
+    note: "Dry ulang perlu cek berkala tiap 15 menit. Estimasi keluar tidak boleh jadi satu-satunya patokan."
+  }
+];
+const STATUS_RANK = {
+  KOSONG: 0,
+  TIDAK_DIPAKAI: 0,
+  PROSES: 1,
+  DRY_ULANG: 1,
+  SELESAI_DRY: 2,
+  SIAP_TURUN: 2,
+  TURUN_PACKING: 3
+};
+const IMMUTABLE_TIME_FIELDS = [["tgl_masuk", "jam_masuk"], ["tgl_defros", "jam_defros"], ["tgl_selesai_dry", "jam_selesai_dry"], ["tgl_turun_packing", "jam_turun_packing"]];
+const RECENT_NAMES_KEY = "dry_recent_names_v1";
+const UI_DRAFT_KEY = "dry_status_ui_draft_v1";
+const el = (id) => document.getElementById(id);
+let slotState = [];
+let selectedSlot = 1;
+let isAppLocked = false;
+let serverState = null;
+let recentNames = [];
+
+const api = (path, data) => fetch(path, {
+  method: data ? "POST" : "GET",
+  headers: { "Content-Type": "application/json" },
+  body: data ? JSON.stringify(data) : undefined
+}).then((r) => r.json());
+
+function cleanText(v) {
+  if (v === undefined || v === null) return "";
+  return String(v).replace(/\uFFFD/g, "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeClock(v) {
+  if (!v) return "";
+  const raw = String(v).trim();
+  if (!raw) return "";
+  const t = raw.replace(/\./g, ":");
+  const byColon = t.match(/^(\d{1,2}):(\d{1,2})$/);
+  if (byColon) {
+    const hh = Number(byColon[1]);
+    const mm = Number(byColon[2]);
+    if (hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+    return raw;
+  }
+  const digits = t.replace(/\D/g, "");
+  if (!digits) return raw;
+  let hh = null;
+  let mm = null;
+  if (digits.length <= 2) { hh = Number(digits); mm = 0; }
+  else if (digits.length === 3) { hh = Number(digits.slice(0, 1)); mm = Number(digits.slice(1, 3)); }
+  else if (digits.length === 4) { hh = Number(digits.slice(0, 2)); mm = Number(digits.slice(2, 4)); }
+  else return raw;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return raw;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+function sanitizeClockInput(v) {
+  const raw = String(v || "").replace(/[^\d:.]/g, "");
+  if (!raw) return "";
+  if (raw.includes(":") || raw.includes(".")) {
+    return raw.slice(0, 5);
+  }
+  return raw.slice(0, 4);
+}
+
+function strictClockOrEmpty(v) {
+  const normalized = normalizeClock(v);
+  return /^\d{2}:\d{2}$/.test(normalized) ? normalized : "";
+}
+
+function getJakartaNow() {
+  const now = new Date();
+  const dp = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const tp = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  const pick = (parts, type) => parts.find((x) => x.type === type)?.value || "";
+  return { date: `${pick(dp, "year")}-${pick(dp, "month")}-${pick(dp, "day")}`, time: `${pick(tp, "hour")}:${pick(tp, "minute")}` };
+}
+
+function nonEmpty(v) {
+  if (v === null || v === undefined) return null;
+  const t = String(v).trim();
+  return t ? t : null;
+}
+
+function splitNames(v) {
+  return String(v || "").split(",").map((x) => cleanText(x)).filter(Boolean);
+}
+
+function buildSuggestedTeamLabel() {
+  const members = splitNames(el("members")?.value);
+  if (members.length > 0) return members.join(" & ");
+  return cleanText(el("lockOwner")?.value);
+}
+
+function formatSavedAt(savedAt) {
+  if (!savedAt) return "belum ada";
+  const time = String(savedAt).match(/T(\d{2}):(\d{2})/);
+  if (time) return `${time[1]}:${time[2]}`;
+  return "tersimpan";
+}
+
+function setDraftChip(savedAt, active) {
+  const chip = el("chipDraft");
+  chip.className = `chip ${active ? "ok" : ""}`.trim();
+  chip.textContent = active ? `Draft lokal: tersimpan ${formatSavedAt(savedAt)}` : "Draft lokal: belum ada";
+}
+
+function getDraftSnapshot() {
+  if (!Array.isArray(slotState) || slotState.length === 0) return null;
+  return {
+    version: 1,
+    saved_at: new Date().toISOString(),
+    selected_slot: selectedSlot,
+    header: {
+      workDate: cleanText(el("workDate").value),
+      shift: cleanText(el("shift").value),
+      lockOwner: cleanText(el("lockOwner").value),
+      members: cleanText(el("members").value),
+      teamFinish: cleanText(el("teamFinish").value),
+      handoverTime: cleanText(el("handoverTime").value),
+      teamId: cleanText(el("teamId").value)
+    },
+    slots: slotState.map((slot) => normalizeSlot(slot))
+  };
+}
+
+function saveDraft() {
+  try {
+    const snapshot = getDraftSnapshot();
+    if (!snapshot) return;
+    localStorage.setItem(UI_DRAFT_KEY, JSON.stringify(snapshot));
+    setDraftChip(snapshot.saved_at, true);
+  } catch (_) {}
+}
+
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(UI_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function applyDraft(draft) {
+  if (!draft || typeof draft !== "object") return false;
+  const header = draft.header || {};
+  if (header.workDate) el("workDate").value = cleanText(header.workDate);
+  if (header.shift && Array.from(el("shift").options).some((x) => x.value === cleanText(header.shift))) {
+    el("shift").value = cleanText(header.shift);
+  }
+  if (header.lockOwner) el("lockOwner").value = cleanText(header.lockOwner);
+  if (header.members) el("members").value = cleanText(header.members);
+  if (header.teamFinish !== undefined) el("teamFinish").value = cleanText(header.teamFinish);
+  if (header.handoverTime !== undefined) el("handoverTime").value = cleanText(header.handoverTime);
+  if (header.teamId) el("teamId").value = cleanText(header.teamId);
+  if (Array.isArray(draft.slots) && draft.slots.length > 0) {
+    const byNo = {};
+    draft.slots.forEach((slot) => { byNo[Number(slot.slot_no)] = normalizeSlot(slot); });
+    slotState = Array.from({ length: 11 }, (_, idx) => byNo[idx + 1] || emptySlot(idx + 1));
+  }
+  selectedSlot = Math.max(1, Math.min(11, Number(draft.selected_slot) || 1));
+  setDraftChip(draft.saved_at, true);
+  return true;
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(UI_DRAFT_KEY);
+  } catch (_) {}
+  setDraftChip("", false);
+}
+
+function canonicalStatus(status) {
+  const s = String(status || "KOSONG");
+  return STATUS_OPTIONS.includes(s) ? s : "KOSONG";
+}
+
+function statusDisplayLabel(status) {
+  return STATUS_META[status]?.label || String(status || "Kosong");
+}
+
+function detectProductRule(productName) {
+  const name = cleanText(productName);
+  if (!name) return null;
+  return PRODUCT_RULES.find((rule) => rule.match.test(name)) || null;
+}
+
+function normalizeDefrostPreference(value) {
+  if (value === true || value === false) return value;
+  const text = cleanText(value).toLowerCase();
+  if (text === "yes" || text === "true") return true;
+  if (text === "no" || text === "false") return false;
+  return null;
+}
+
+function effectiveDefrostRequired(slot) {
+  if (typeof slot.needs_defrost === "boolean") return slot.needs_defrost;
+  if (slot.jam_defros || slot.tgl_defros) return true;
+  const rule = detectProductRule(slot.status_isi);
+  if (rule && typeof rule.requiresDefrost === "boolean") return rule.requiresDefrost;
+  return true;
+}
+
+function addMinutesToClock(clockValue, minutes) {
+  const matched = normalizeClock(clockValue).match(/^(\d{2}):(\d{2})$/);
+  if (!matched) return "";
+  const base = Number(matched[1]) * 60 + Number(matched[2]) + Number(minutes || 0);
+  const wrapped = ((base % 1440) + 1440) % 1440;
+  const hh = String(Math.floor(wrapped / 60)).padStart(2, "0");
+  const mm = String(wrapped % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function processStage(slot) {
+  if (slot.status_enum !== "PROSES") return "";
+  if (effectiveDefrostRequired(slot) && (slot.jam_defros || slot.tgl_defros)) return "DEFROST";
+  if (slot.jam_masuk || slot.tgl_masuk) return "LAGI_DIISI";
+  return "PROSES";
+}
+
+
+function inferStatusFromSlotData(slot) {
+  if (slot.jam_turun_packing || slot.tgl_turun_packing) return "TURUN_PACKING";
+  if (slot.jam_selesai_dry || slot.tgl_selesai_dry) return "SELESAI_DRY";
+  if (slot.jam_masuk || slot.tgl_masuk || slot.jam_defros || slot.tgl_defros) return "PROSES";
+  if (slot.jam_estimasi_keluar || slot.status_isi || slot.petugas_masuk || slot.petugas_keluar || slot.atas_izin) {
+    return "PROSES";
+  }
+  return "";
+}
+
+function emptySlot(slotNo) {
+  return {
+    slot_no: slotNo,
+    status_enum: "KOSONG",
+    tgl_masuk: null,
+    jam_masuk: null,
+    tgl_defros: null,
+    jam_defros: null,
+    jam_estimasi_defrost: null,
+    jam_estimasi_keluar: null,
+    petugas_masuk: null,
+    tgl_selesai_dry: null,
+    jam_selesai_dry: null,
+    partial_out: false,
+    jam_keluar_sebagian: null,
+    jam_estimasi_sisa: null,
+    petugas_keluar: null,
+    tgl_turun_packing: null,
+    jam_turun_packing: null,
+    needs_defrost: null,
+    status_isi: null,
+    atas_izin: null,
+    notes: null
+  };
+}
+
+function normalizeSlot(slot) {
+  const s = { ...emptySlot(Number(slot.slot_no || 1)), ...(slot || {}) };
+  s.status_enum = canonicalStatus(s.status_enum);
+  ["jam_masuk", "jam_defros", "jam_estimasi_defrost", "jam_estimasi_keluar", "jam_selesai_dry", "jam_keluar_sebagian", "jam_estimasi_sisa", "jam_turun_packing"].forEach((k) => {
+    s[k] = nonEmpty(normalizeClock(s[k]));
+  });
+  ["tgl_masuk", "tgl_defros", "tgl_selesai_dry", "tgl_turun_packing", "petugas_masuk", "petugas_keluar", "status_isi", "atas_izin", "notes"].forEach((k) => {
+    s[k] = nonEmpty(cleanText(s[k]));
+  });
+  s.needs_defrost = normalizeDefrostPreference(s.needs_defrost);
+  s.partial_out = cleanText(s.partial_out).toLowerCase() === "yes" || s.partial_out === true;
+
+  const inferred = inferStatusFromSlotData(s);
+  if ((s.status_enum === "KOSONG" || s.status_enum === "TIDAK_DIPAKAI") && inferred) {
+    s.status_enum = inferred;
+  }
+
+  return s;
+}
+function shortTimeLabel(slot){
+  if(slot.jam_turun_packing) return `turun ${slot.jam_turun_packing}`;
+  if(slot.jam_selesai_dry) return `selesai ${slot.jam_selesai_dry}`;
+  if(slot.jam_masuk) return `masuk ${slot.jam_masuk}`;
+  if(slot.jam_defros) return `defrost ${slot.jam_defros}`;
+  if(slot.jam_estimasi_keluar) return `estimasi ${slot.jam_estimasi_keluar}`;
+  return "belum ada jam";
+}
+
+function slotSummaryText(slot){
+  const content = cleanText(slot.status_isi || "-").toUpperCase();
+  return `No.${slot.slot_no} | ${slot.status_enum} | ${content} | ${shortTimeLabel(slot)}`;
+}
+
+function slotStartClock(slot) {
+  return slot.jam_masuk || slot.jam_defros || "";
+}
+
+function slotTargetClock(slot) {
+  if (processStage(slot) === "DEFROST" && effectiveDefrostRequired(slot)) return slot.jam_estimasi_defrost || "";
+  if (slot.partial_out && slot.jam_estimasi_sisa) return slot.jam_estimasi_sisa;
+  return slot.jam_estimasi_keluar || "";
+}
+
+function clockToMinutes(clockValue) {
+  const matched = normalizeClock(clockValue).match(/^(\d{2}):(\d{2})$/);
+  if (!matched) return null;
+  return Number(matched[1]) * 60 + Number(matched[2]);
+}
+
+function formatDurationMinutes(totalMinutes) {
+  const mins = Math.max(0, Number(totalMinutes) || 0);
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  if (hours <= 0) return `${rest}m`;
+  if (rest === 0) return `${hours}j`;
+  return `${hours}j ${rest}m`;
+}
+
+function elapsedOrRemainingLabel(slot) {
+  const nowMinutes = clockToMinutes(getJakartaNow().time);
+  const startMinutes = clockToMinutes(slotStartClock(slot));
+  const targetMinutes = clockToMinutes(slotTargetClock(slot));
+  if (nowMinutes === null) return shortTimeLabel(slot);
+  if (targetMinutes !== null) {
+    const diff = targetMinutes - nowMinutes;
+    const prefix = diff >= 0 ? "Sisa" : "Lewat";
+    return `${prefix} ${formatDurationMinutes(Math.abs(diff))}`;
+  }
+  if (startMinutes !== null) {
+    return `Jalan ${formatDurationMinutes(Math.max(0, nowMinutes - startMinutes))}`;
+  }
+  return shortTimeLabel(slot);
+}
+
+function compactSlotListText(slots) {
+  if (!Array.isArray(slots) || slots.length === 0) return "-";
+  const labels = slots.slice(0, 5).map((slot) => `No.${slot.slot_no}`);
+  if (slots.length > 5) labels.push(`+${slots.length - 5}`);
+  return labels.join(", ");
+}
+
+function focusStartLabel(slot) {
+  if (slot.jam_defros) return `Defrost ${slot.jam_defros}`;
+  if (slot.jam_masuk) return `Masuk ${slot.jam_masuk}`;
+  if (slot.jam_estimasi_keluar) return `Estimasi ${slot.jam_estimasi_keluar}`;
+  return "";
+}
+
+function hasSlotHistory(slot){
+  return Boolean(
+    slot.jam_masuk || slot.jam_defros || slot.jam_selesai_dry || slot.jam_turun_packing ||
+    slot.status_isi || slot.petugas_masuk || slot.petugas_keluar || slot.atas_izin
+  );
+}
+
+function isUnfinished(slot){
+  if(["PROSES","SIAP_TURUN","DRY_ULANG"].includes(slot.status_enum)) return true;
+  if(slot.status_enum==="SELESAI_DRY" && !slot.jam_turun_packing) return true;
+  return false;
+}
+
+function etaRisk(slot){
+  const targetClock = slot.partial_out && slot.jam_estimasi_sisa ? slot.jam_estimasi_sisa : slot.jam_estimasi_keluar;
+  if(!targetClock || !isUnfinished(slot)) return false;
+  const e = normalizeClock(targetClock).match(/^(\d{2}):(\d{2})$/);
+  const n = getJakartaNow().time.match(/^(\d{2}):(\d{2})$/);
+  if(!e || !n) return false;
+  const etaMin = Number(e[1])*60 + Number(e[2]);
+  const nowMin = Number(n[1])*60 + Number(n[2]);
+  return nowMin >= etaMin - 30;
+}
+
+function defrostDueRisk(slot) {
+  if (processStage(slot) !== "DEFROST") return false;
+  const due = normalizeClock(slot.jam_estimasi_defrost).match(/^(\d{2}):(\d{2})$/);
+  const now = getJakartaNow().time.match(/^(\d{2}):(\d{2})$/);
+  if (!due || !now) return false;
+  const dueMin = Number(due[1]) * 60 + Number(due[2]);
+  const nowMin = Number(now[1]) * 60 + Number(now[2]);
+  return nowMin >= dueMin;
+}
+
+function currentActionType(slot) {
+  if (defrostDueRisk(slot)) return "MULAI DRY";
+  if (slot.status_enum === "SIAP_TURUN") return "KELUARKAN";
+  if (slot.status_enum === "SELESAI_DRY" && !slot.jam_turun_packing) return "KELUARKAN";
+  if (etaRisk(slot) && (slot.status_enum === "PROSES" || slot.status_enum === "DRY_ULANG")) return "CEK DRY";
+  return "";
+}
+
+function currentActionLabel(slot) {
+  const action = currentActionType(slot);
+  if (action === "MULAI DRY") return "Mulai dry";
+  if (action === "KELUARKAN") return "Keluarkan ke packing";
+  if (action === "CEK DRY") return "Cek dry";
+  return "";
+}
+
+function actionTypeBadgeLabel(slot) {
+  const action = currentActionType(slot);
+  if (action === "MULAI DRY") return "AKSI: MULAI DRY";
+  if (action === "KELUARKAN") return "AKSI: KELUARKAN";
+  if (action === "CEK DRY") return "AKSI: CEK DRY";
+  return "";
+}
+
+function actionReason(slot) {
+  const action = currentActionType(slot);
+  if (action === "MULAI DRY") return "Mulai dry sekarang";
+  if (action === "KELUARKAN") return "Keluarkan ke packing";
+  if (action === "CEK DRY") return "Cek apakah dry sudah selesai";
+  return "";
+}
+
+function actionPriorityText(slot) {
+  const action = currentActionType(slot);
+  if (action === "CEK DRY") return "Cek apakah dry sudah selesai";
+  if (action === "KELUARKAN") return "Cek apakah barang sudah turun ke packing";
+  if (action === "MULAI DRY") return effectiveDefrostRequired(slot) ? "Mulai dry setelah defrost" : "Mulai dry sekarang";
+  return "Cek slot sesuai perubahan terakhir";
+}
+
+function summaryMiniCards(slots, mode = "active") {
+  if (!Array.isArray(slots) || slots.length === 0) return `<div class="summary-slots">-</div>`;
+  const visible = slots.slice(0, 3);
+  const cards = visible.map((slot) => {
+    const timingParts = [focusStartLabel(slot), elapsedOrRemainingLabel(slot)].filter(Boolean);
+    const actionKind = mode === "action" ? actionTypeBadgeLabel(slot) : "";
+    const stateLine = slot.partial_out ? "SEBAGIAN KELUAR, SISA MASIH DRY" : "";
+    return `<div class="summary-mini">
+      <strong>No.${slot.slot_no} | ${cleanText(slot.status_isi || "-").toUpperCase()}</strong>
+      ${actionKind ? `<div class="summary-mini-kind">${actionKind}</div>` : ``}
+      <span>${slotUpdateType(slot)}</span>
+      ${timingParts.length ? `<span>${timingParts.join(" | ")}</span>` : ``}
+      ${stateLine ? `<div class="summary-mini-state">${stateLine}</div>` : ``}
+      <div class="summary-mini-action">${actionPriorityText(slot)}</div>
+    </div>`;
+  }).join("");
+  const more = slots.length > visible.length ? `<div class="summary-more">+${slots.length - visible.length} slot lain</div>` : "";
+  return `<div class="summary-mini-list">${cards}</div>${more}`;
+}
+
+function slotUpdateType(slot) {
+  if (hasSlotHistory(slot) && !slot.jam_turun_packing) return "Lanjutan shift sebelumnya";
+  if (!hasSlotHistory(slot) || slot.status_enum === "KOSONG" || slot.status_enum === "TIDAK_DIPAKAI") return "Update shift saya";
+  return "Cek perubahan shift saya";
+}
+
+function slotActionSource(slot) {
+  if (hasSlotHistory(slot) && !slot.jam_turun_packing) return "selesaikan slot lama yang masih berjalan";
+  return "catat hanya perubahan dari shift saya";
+}
+
+function slotGroup(slot) {
+  if (slot.status_enum === "TIDAK_DIPAKAI") return "broken";
+  if (slot.status_enum === "KOSONG" || slot.status_enum === "TURUN_PACKING") return "nonactive";
+  if (["PROSES","DRY_ULANG","SIAP_TURUN","SELESAI_DRY"].includes(slot.status_enum)) return "active";
+  return "nonactive";
+}
+
+function slotGroupLabel(slot) {
+  const group = slotGroup(slot);
+  if (group === "active") return "SLOT AKTIF";
+  if (group === "nonactive") return "KOSONG";
+  if (group === "broken") return "TIDAK DIPAKAI";
+  return "KOSONG";
+}
+
+function slotGroupClass(slot) {
+  const group = slotGroup(slot);
+  if (group === "active") return "group-active";
+  if (group === "broken") return "group-broken";
+  return "group-nonactive";
+}
+
+function slotGroupBadgeClass(slot) {
+  const group = slotGroup(slot);
+  if (group === "active") return "badge-active";
+  if (group === "broken") return "badge-broken";
+  return "badge-nonactive";
+}
+
+function slotStateLabel(slot) {
+  if (slot.partial_out) return "SEBAGIAN KELUAR, SISA MASIH DRY";
+  if (slot.status_enum === "PROSES") {
+    const stage = processStage(slot);
+    if (stage === "DEFROST") return "Defrost";
+    if (stage === "LAGI_DIISI") return "Lagi diisi";
+    return "Sedang dry";
+  }
+  if (slot.status_enum === "DRY_ULANG") return "Dry ulang";
+  if (slot.status_enum === "SIAP_TURUN") return "Siap turun";
+  if (slot.status_enum === "SELESAI_DRY") return "Selesai dry";
+  if (slot.status_enum === "TURUN_PACKING") return "Sudah turun ke packing";
+  if (slot.status_enum === "TIDAK_DIPAKAI") return "Mesin tidak dipakai / rusak";
+  return "Kosong";
+}
+
+function isCurrentlyDrying(slot) {
+  return slot.status_enum === "PROSES" || slot.status_enum === "DRY_ULANG";
+}
+
+function clockSortValue(clockValue) {
+  const matched = normalizeClock(clockValue).match(/^(\d{2}):(\d{2})$/);
+  if (!matched) return Number.POSITIVE_INFINITY;
+  return Number(matched[1]) * 60 + Number(matched[2]);
+}
+
+function liveDryStageLabel(slot) {
+  if (slot.status_enum === "DRY_ULANG") return "DRY ULANG";
+  const stage = processStage(slot);
+  if (stage === "DEFROST") return "DEFROST";
+  if (stage === "LAGI_DIISI") return "LAGI DIISI";
+  return "SEDANG DRY";
+}
+
+function renderLiveDryList() {
+  const root = el("liveDryList");
+  const box = el("liveDryBox");
+  if (!root) return;
+
+  const items = slotState
+    .filter((slot) => isCurrentlyDrying(slot))
+    .slice()
+    .sort((a, b) => {
+      const aTarget = processStage(a) === "DEFROST" ? a.jam_estimasi_defrost : (a.partial_out && a.jam_estimasi_sisa ? a.jam_estimasi_sisa : a.jam_estimasi_keluar);
+      const bTarget = processStage(b) === "DEFROST" ? b.jam_estimasi_defrost : (b.partial_out && b.jam_estimasi_sisa ? b.jam_estimasi_sisa : b.jam_estimasi_keluar);
+      return clockSortValue(aTarget) - clockSortValue(bTarget) || a.slot_no - b.slot_no;
+    });
+
+  if (box) box.style.display = items.length > 0 ? "block" : "none";
+
+  if (items.length === 0) {
+    root.innerHTML = `<div class="live-dry-empty">Belum ada slot yang sedang dry saat ini.</div>`;
+    return;
+  }
+
+  root.innerHTML = items.slice(0, 3).map((slot) => {
+    const start = slot.jam_defros || slot.jam_masuk || "-";
+    const end = processStage(slot) === "DEFROST"
+      ? (slot.jam_estimasi_defrost || "-")
+      : (slot.partial_out && slot.jam_estimasi_sisa ? slot.jam_estimasi_sisa : (slot.jam_estimasi_keluar || "-"));
+    const product = cleanText(slot.status_isi || "-").toUpperCase();
+    const stage = liveDryStageLabel(slot);
+    return `<div class="live-dry-item">
+      <b>No.${slot.slot_no} | ${product}</b>
+      <div class="live-dry-meta">${stage} | Mulai ${start} | Estimasi selesai ${end}${slot.partial_out ? " | Sebagian keluar" : ""}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderShiftWorkflow() {
+  const carryCount = slotState.filter((slot) => hasSlotHistory(slot) && isUnfinished(slot)).length;
+  el("shiftWorkflowTitle").textContent = `Mode kerja ${cleanText(el("shift").value) || "shift ini"}`;
+  el("shiftWorkflowText").textContent = `Lanjutkan ${carryCount} slot lama yang belum selesai, lalu update slot baru dari shift ini hanya bila ada perubahan.`;
+}
+
+function renderFocusList() {
+  const root = el("focusList");
+  if (!root) return;
+  const items = slotState
+    .filter((slot) => currentActionType(slot) || (isCurrentlyDrying(slot) && hasSlotHistory(slot)))
+    .slice()
+    .sort((a, b) => {
+      const aAction = currentActionType(a) ? 0 : 1;
+      const bAction = currentActionType(b) ? 0 : 1;
+      return aAction - bAction || a.slot_no - b.slot_no;
+    })
+    .slice(0, 5);
+
+  if (items.length === 0) {
+    root.innerHTML = `<div class="live-dry-empty">Belum ada slot prioritas. Buka slot hanya saat ada perubahan.</div>`;
+    return;
+  }
+
+  root.innerHTML = items.map((slot) => {
+    const start = focusStartLabel(slot);
+    const timeLine = [
+      start,
+      elapsedOrRemainingLabel(slot)
+    ].filter(Boolean).join(" | ");
+    return `<button class="focus-item" data-focus-slot="${slot.slot_no}">
+      <strong>No.${slot.slot_no} | ${cleanText(slot.status_isi || "-").toUpperCase()}</strong>
+      <span>${slotUpdateType(slot)}</span>
+      <span>${timeLine}</span>
+      <span class="focus-check">${actionPriorityText(slot)}</span>
+    </button>`;
+  }).join("");
+
+  root.querySelectorAll("button[data-focus-slot]").forEach((btn) => {
+    btn.onclick = () => {
+      selectedSlot = Number(btn.dataset.focusSlot);
+      renderAll();
+      saveDraft();
+    };
+  });
+}
+
+function renderProductRuleState(slot) {
+  const rule = detectProductRule(slot.status_isi);
+  const resolvedDefrost = effectiveDefrostRequired(slot);
+  const hasDefrostData = Boolean(slot.jam_defros || slot.tgl_defros);
+  const manualDefrostChoice = normalizeDefrostPreference(slot.needs_defrost);
+  const selectedDefrostChoice = typeof manualDefrostChoice === "boolean" ? manualDefrostChoice : resolvedDefrost;
+
+  el("needsDefrost").value = selectedDefrostChoice ? "yes" : "no";
+
+  el("defrostRow").style.display = selectedDefrostChoice ? "block" : "none";
+  el("defrostEstimateRow").style.display = selectedDefrostChoice ? "block" : "none";
+  el("partialOut").value = slot.partial_out ? "yes" : "no";
+  el("partialOutTimeRow").style.display = slot.partial_out ? "block" : "none";
+  el("remainingEstimateRow").style.display = slot.partial_out ? "block" : "none";
+
+  const noteParts = [];
+  if (manualDefrostChoice === false && hasDefrostData) {
+    noteParts.push("Pilihan defrost diperbarui. Kolom defrost disembunyikan, tetapi catatan defrost lama tetap tersimpan karena sudah tercatat.");
+  }
+  if (!resolvedDefrost && !hasDefrostData) {
+    noteParts.push("Produk ini tidak perlu defrost, jadi kolom defrost disembunyikan.");
+  }
+  if (rule?.recheckEveryMinutes) {
+    const baseClock = slot.jam_defros || slot.jam_masuk;
+    const nextCheck = baseClock ? addMinutesToClock(baseClock, rule.recheckEveryMinutes) : "";
+    noteParts.push(rule.note);
+    if (nextCheck) {
+      noteParts.push(`Saran cek berikutnya sekitar ${nextCheck}.`);
+    }
+  }
+  if (!rule) {
+    noteParts.push("Belum ada rule produk khusus. Defrost dan estimasi masih perlu dicek manual.");
+  }
+  noteParts.push("Saat handover/selesai shift, cek lagi apakah masih ada produk tertinggal di mesin.");
+
+  el("productRuleNote").textContent = noteParts.join(" ");
+}
+
+function setEditorChangeNote(message) {
+  const node = el("editorChangeNote");
+  if (!node) return;
+  const text = cleanText(message);
+  if (!text) {
+    node.style.display = "none";
+    node.textContent = "";
+    return;
+  }
+  node.style.display = "block";
+  node.textContent = text;
+}
+
+function buildEditorChangeMessage(previous, next, source) {
+  if (!source) return "";
+  if (source === "needsDefrost") {
+    const changed = previous.needs_defrost !== next.needs_defrost;
+    if (!changed) return "Pilihan defrost tetap sama.";
+    const hasDefrostHistory = Boolean(next.jam_defros || next.tgl_defros);
+    if (next.needs_defrost === false && !hasDefrostHistory) {
+      return "Pilihan defrost disimpan. Jalur rekomendasi sekarang tanpa defrost.";
+    }
+    if (next.needs_defrost === false && hasDefrostHistory) {
+      return "Pilihan defrost disimpan, tetapi catatan defrost lama tetap terlihat karena sudah tercatat.";
+    }
+    if (next.needs_defrost === true) {
+      return "Pilihan defrost disimpan. Defrost kembali masuk jalur rekomendasi slot ini.";
+    }
+  }
+  if (source === "partialOut") {
+    if (previous.partial_out === next.partial_out) return "Status sebagian keluar tetap sama.";
+    return next.partial_out
+      ? "Status sebagian keluar disimpan. Kolom sisa dry dibuka."
+      : "Status sebagian keluar disimpan. Kolom sisa dry disembunyikan.";
+  }
+  if (source === "statusIsi" && previous.status_isi !== next.status_isi) {
+    return "Produk slot diperbarui. Rule dan saran sistem dicek ulang.";
+  }
+  if (source === "atasIzin" && previous.atas_izin !== next.atas_izin) {
+    return "Atas izin diperbarui di draft lokal.";
+  }
+  if (source === "notes" && previous.notes !== next.notes) {
+    return "Catatan diperbarui di draft lokal.";
+  }
+  return "";
+}
+
+function recordOnlyWarning(slot) {
+  if (slot.jam_turun_packing && slot.status_enum !== "TURUN_PACKING") {
+    return "Jam turun packing sudah terisi, tetapi status papan masih mengikuti kondisi slot saat ini. Gunakan Keluarkan ke Packing atau Koreksi status manual bila status papan perlu ikut berubah.";
+  }
+  if (slot.jam_selesai_dry && !["SIAP_TURUN", "SELESAI_DRY", "TURUN_PACKING"].includes(slot.status_enum)) {
+    return "Jam selesai dry sudah terisi, tetapi status papan belum otomatis berubah. Gunakan Selesai Dry atau Koreksi status manual bila status papan perlu ikut berubah.";
+  }
+  return "";
+}
+
+function loadRecentNames(){
+  try{
+    const raw = localStorage.getItem(RECENT_NAMES_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    recentNames = Array.isArray(arr) ? arr.filter(Boolean).slice(0, 20) : [];
+  } catch(_){
+    recentNames = [];
+  }
+}
+
+function saveRecentNames(){
+  try{ localStorage.setItem(RECENT_NAMES_KEY, JSON.stringify(recentNames.slice(0,20))); } catch(_){}
+}
+
+function rememberNamesFromText(text){
+  const items = String(text || "").split(",").map((x)=>cleanText(x)).filter(Boolean);
+  if(items.length===0) return;
+  items.forEach((name)=>{
+    const idx = recentNames.findIndex((x)=>x.toLowerCase()===name.toLowerCase());
+    if(idx>=0) recentNames.splice(idx,1);
+    recentNames.unshift(name);
+  });
+  recentNames = recentNames.slice(0,20);
+  saveRecentNames();
+  renderRecentNameOptions();
+}
+
+function renderRecentNameOptions(){
+  const list = el("recentNameList");
+  list.innerHTML = recentNames.map((n)=>`<option value="${n}"></option>`).join("");
+}
+
+function renderSummary(){
+  const groups = {
+    active: slotState.filter((s) => slotGroup(s) === "active"),
+    nonactive: slotState.filter((s) => slotGroup(s) === "nonactive"),
+    broken: slotState.filter((s) => slotGroup(s) === "broken"),
+    action: slotState.filter((s) => currentActionType(s))
+  };
+  el("summaryGrid").innerHTML = [
+    `<div class="summary state-active"><div class="summary-head"><span>SLOT AKTIF</span><b>${groups.active.length}</b></div>${summaryMiniCards(groups.active, "active")}</div>`,
+    `<div class="summary state-action"><div class="summary-head"><span>PERLU AKSI</span><b>${groups.action.length}</b></div>${summaryMiniCards(groups.action, "action")}</div>`
+  ].join("");
+  el("summaryPassive").innerHTML = [
+    `<div class="summary-passive"><strong>KOSONG</strong><span>${compactSlotListText(groups.nonactive)}</span></div>`,
+    `<div class="summary-passive"><strong>TIDAK DIPAKAI</strong><span>${compactSlotListText(groups.broken)}</span></div>`
+  ].join("");
+}
+
+function renderBoard(){
+  const html = slotState.map((s)=>{
+    const actionText = currentActionType(s) ? actionPriorityText(s) : "";
+    const timingText = elapsedOrRemainingLabel(s);
+    const productText = cleanText(s.status_isi || "Belum ada produk");
+    return `<button class="slot-btn ${slotGroupClass(s)} ${s.status_enum==="TIDAK_DIPAKAI"?"tidak-x":""} ${s.slot_no===selectedSlot?"active":""}" data-slot="${s.slot_no}">
+    ${s.status_enum==="TIDAK_DIPAKAI" ? `<div class="slot-x-mark">X</div><div class="slot-x-label">TIDAK DIPAKAI</div>` : ""}
+    <div class="slot-content">
+      <div class="slot-status-badge ${slotGroupBadgeClass(s)}">${slotGroupLabel(s)}</div>
+      <div class="slot-no">No.${s.slot_no}</div>
+      <div class="slot-main">${productText.toUpperCase()}</div>
+      <div class="slot-phase">${slotStateLabel(s)}</div>
+      <div class="slot-sub">${timingText}</div>
+      ${actionText ? `<div class="slot-alert">${actionText}</div>` : ``}
+    </div>
+  </button>`;
+  }).join("");
+  el("slotBoard").innerHTML = html;
+  el("slotBoard").querySelectorAll("button[data-slot]").forEach((btn)=>{
+    btn.onclick = ()=>{ selectedSlot = Number(btn.dataset.slot); renderAll(); saveDraft(); };
+  });
+}
+
+function recommendedActionText(status){
+  if(status==="KOSONG") return "Pilih aksi awal hanya bila slot ini benar-benar berubah.";
+  if(status==="TIDAK_DIPAKAI") return "Biarkan di status ini sampai slot dipakai lagi.";
+  if(status==="PROSES") return "Catat event berikutnya yang benar-benar terjadi.";
+  if(status==="SIAP_TURUN") return "Lanjutkan hanya saat produk benar-benar keluar ke packing.";
+  if(status==="SELESAI_DRY") return "Gunakan aksi keluar saat transfer sudah terjadi.";
+  if(status==="TURUN_PACKING") return "Slot ini sudah selesai.";
+  if(status==="DRY_ULANG") return "Lanjut proses dan cek berkala.";
+  return "Saran: ubah hanya bagian yang memang berubah.";
+}
+
+function pickPrimaryAction(slot) {
+  if (slot.status_enum === "KOSONG") {
+    return effectiveDefrostRequired(slot) && !slot.jam_defros ? "defros" : "masuk";
+  }
+  if (slot.status_enum === "PROSES" && effectiveDefrostRequired(slot) && !slot.jam_defros && processStage(slot) !== "DEFROST") {
+    return "defros";
+  }
+  if (slot.status_enum === "PROSES" || slot.status_enum === "DRY_ULANG") return "selesai";
+  if (slot.status_enum === "SIAP_TURUN" || slot.status_enum === "SELESAI_DRY") return "turun";
+  return "";
+}
+
+function pickSecondaryActions(slot, primaryAction) {
+  const out = [];
+  if (slot.status_enum === "KOSONG" && effectiveDefrostRequired(slot) && !slot.jam_defros) out.push("defros");
+  if ((slot.status_enum === "PROSES" || slot.status_enum === "DRY_ULANG") && effectiveDefrostRequired(slot) && !slot.jam_defros) out.push("defros");
+  if ((slot.status_enum === "SIAP_TURUN" || slot.status_enum === "SELESAI_DRY") && !slot.jam_selesai_dry) out.push("selesai");
+  return out.filter((action) => action !== primaryAction).slice(0, 2);
+}
+
+function actionDisplayLabel(action) {
+  return {
+    masuk: "Mulai Dry",
+    defros: "Mulai Defrost",
+    selesai: "Selesai Dry",
+    turun: "Keluarkan ke Packing",
+    kosong: "Set kosong",
+    tidak: "Set tidak dipakai"
+  }[action] || "";
+}
+
+function isTerminalSlot(slot) {
+  return slot.status_enum === "TURUN_PACKING" || slot.status_enum === "TIDAK_DIPAKAI";
+}
+
+function defrostGuidanceText(slot) {
+  if (isTerminalSlot(slot)) return "";
+  if (!effectiveDefrostRequired(slot) && !slot.jam_defros) return "Defrost tidak diperlukan. Lanjutkan jalur tanpa defrost.";
+  if (effectiveDefrostRequired(slot) && !slot.jam_defros && processStage(slot) !== "DEFROST") return "Defrost masih termasuk jalur yang diharapkan untuk slot ini.";
+  return "";
+}
+
+function setActionButton(node, action, kind = "secondary") {
+  if (!node) return;
+  node.textContent = actionDisplayLabel(action) || "Aksi";
+  node.dataset.action = action || "";
+  node.classList.remove("recommend");
+  node.style.display = action ? "block" : "none";
+  if (kind === "primary" && action) node.classList.add("recommend");
+}
+
+function getQuickActionState(slot, action) {
+  if (action === "masuk") {
+    if (slot.jam_masuk) return { disabled: true, reason: "Jam masuk sudah tercatat." };
+    return { disabled: false, reason: "Catat waktu produk mulai masuk ke slot." };
+  }
+  if (action === "defros") {
+    if (!effectiveDefrostRequired(slot) && !slot.jam_defros && !slot.tgl_defros) {
+      return { disabled: true, reason: "Produk ini tidak perlu defrost." };
+    }
+    if (slot.jam_defros) return { disabled: true, reason: "Jam defrost sudah tercatat." };
+    if (!slot.jam_masuk && slot.status_enum === "KOSONG") return { disabled: false, reason: "Bisa dipakai bila defrost memang jadi event pertama yang dicatat." };
+    return { disabled: false, reason: "Catat waktu defrost." };
+  }
+  if (action === "selesai") {
+    if (slot.jam_selesai_dry) return { disabled: true, reason: "Jam selesai dry sudah tercatat." };
+    if (slot.status_enum === "TURUN_PACKING") return { disabled: true, reason: "Slot ini sudah turun ke packing." };
+    return { disabled: false, reason: "Pakai saat dry benar-benar selesai." };
+  }
+  if (action === "turun") {
+    if (slot.jam_turun_packing) return { disabled: true, reason: "Jam turun packing sudah tercatat." };
+    return { disabled: false, reason: "Pakai saat slot benar-benar sudah dipindah ke packing." };
+  }
+  if (action === "kosong") {
+    if (slot.jam_masuk || slot.jam_defros || slot.jam_selesai_dry || slot.jam_turun_packing) {
+      return { disabled: true, reason: "Tidak bisa set kosong karena slot ini sudah punya riwayat waktu." };
+    }
+    return { disabled: false, reason: "Pakai bila slot memang kosong dan belum ada riwayat." };
+  }
+  if (action === "tidak") {
+    if (slot.jam_masuk || slot.jam_defros || slot.jam_selesai_dry || slot.jam_turun_packing) {
+      return { disabled: true, reason: "Tidak bisa set tidak dipakai karena slot ini sudah punya riwayat waktu." };
+    }
+    return { disabled: false, reason: "Pakai bila slot memang tidak dipakai." };
+  }
+  return { disabled: false, reason: "" };
+}
+
+function renderQuickActionState(slot) {
+  const actionMap = {
+    actMasuk: "masuk",
+    actDefros: "defros",
+    actSelesai: "selesai",
+    actTurun: "turun",
+    actKosong: "kosong",
+    actTidak: "tidak"
+  };
+  const primaryAction = pickPrimaryAction(slot);
+  const secondaryActions = pickSecondaryActions(slot, primaryAction);
+  const primaryNode = el("actPrimary");
+  const primaryState = primaryAction ? getQuickActionState(slot, primaryAction) : { disabled: true, reason: "" };
+
+  setActionButton(primaryNode, primaryAction, "primary");
+  primaryNode.disabled = Boolean(!primaryAction || primaryState.disabled);
+  primaryNode.title = primaryState.reason || "";
+  if (!primaryAction) {
+    primaryNode.style.display = "block";
+    primaryNode.textContent = "Tidak ada aksi cepat";
+    primaryNode.dataset.action = "";
+  }
+
+  ["actMasuk","actDefros","actSelesai","actTurun"].forEach((id) => {
+    const action = actionMap[id];
+    const node = el(id);
+    const state = getQuickActionState(slot, action);
+    const visible = secondaryActions.includes(action) && !state.disabled;
+    setActionButton(node, action);
+    node.disabled = Boolean(state.disabled);
+    node.title = state.reason || "";
+    node.style.display = visible ? "block" : "none";
+  });
+
+  let visibleRiskActions = 0;
+  ["actKosong","actTidak"].forEach((id) => {
+    const action = actionMap[id];
+    const node = el(id);
+    const state = getQuickActionState(slot, action);
+    setActionButton(node, action);
+    node.disabled = Boolean(state.disabled);
+    node.title = state.reason || "";
+    const visible = !state.disabled;
+    node.style.display = visible ? "block" : "none";
+    if (visible) visibleRiskActions += 1;
+  });
+  el("riskBox").style.display = visibleRiskActions > 0 ? "block" : "none";
+
+  const terminal = isTerminalSlot(slot);
+  el("actionPrimaryBox").style.display = terminal ? "none" : "block";
+  el("actionSecondaryBox").style.display = terminal ? "none" : "grid";
+
+  const actionLine = currentActionLabel(slot) || actionDisplayLabel(primaryAction) || "Tidak ada aksi mendesak";
+  let note = terminal
+    ? `Slot ini sudah selesai. Buka lagi hanya bila perlu koreksi.`
+    : `Fokus sekarang: ${actionLine}.`;
+  if (primaryState.reason) {
+    note += ` ${primaryState.reason}`;
+  }
+  const defrostGuidance = defrostGuidanceText(slot);
+  if (defrostGuidance) {
+    note += ` ${defrostGuidance}`;
+  }
+  el("actionNote").textContent = note;
+}
+
+function highlightRecommendedButtons(status){
+  ["actPrimary","actMasuk","actDefros","actSelesai","actTurun","actKosong","actTidak"].forEach((id)=>el(id).classList.remove("recommend"));
+}
+function renderDetailEditor(){
+  const slot = slotState[selectedSlot - 1];
+  if(!slot) return;
+  el("editorTitle").textContent = `Detail Slot No.${slot.slot_no}`;
+  const defrostGuidance = defrostGuidanceText(slot);
+  const helperParts = [
+    `Status terbaca: ${slotStateLabel(slot)}.`,
+    `Status papan mengikuti aksi cepat atau Koreksi status manual.`,
+    currentActionLabel(slot)
+      ? `Lanjutkan aksi: ${currentActionLabel(slot)}.`
+      : `Gunakan tombol hanya bila slot ini benar-benar berubah.`
+  ];
+  if (defrostGuidance) helperParts.push(defrostGuidance);
+  el("editorHint").textContent = helperParts.join(" ").trim();
+  el("detailCurrentState").textContent = slotStateLabel(slot);
+  el("detailUpdateType").textContent = slotUpdateType(slot);
+  el("detailCurrentAction").textContent = currentActionLabel(slot) || actionDisplayLabel(pickPrimaryAction(slot)) || "Tidak ada aksi mendesak";
+  el("detailActionSource").textContent = slotActionSource(slot);
+  highlightRecommendedButtons(slot.status_enum);
+
+  el("statusIsi").value = slot.status_isi || "";
+  el("statusEnum").innerHTML = STATUS_OPTIONS.map((v)=>`<option value="${v}" ${v===slot.status_enum?"selected":""}>${statusDisplayLabel(v)}</option>`).join("");
+  el("tglMasuk").value = slot.tgl_masuk || "";
+  el("jamMasuk").value = slot.jam_masuk || "";
+  el("tglDefros").value = slot.tgl_defros || "";
+  el("jamDefros").value = slot.jam_defros || "";
+  el("jamEstimasiDefrost").value = slot.jam_estimasi_defrost || "";
+  el("jamEstimasi").value = slot.jam_estimasi_keluar || "";
+  el("tglSelesai").value = slot.tgl_selesai_dry || "";
+  el("jamSelesai").value = slot.jam_selesai_dry || "";
+  el("jamKeluarSebagian").value = slot.jam_keluar_sebagian || "";
+  el("jamEstimasiSisa").value = slot.jam_estimasi_sisa || "";
+  el("tglTurun").value = slot.tgl_turun_packing || "";
+  el("jamTurun").value = slot.jam_turun_packing || "";
+  el("petugasMasuk").value = slot.petugas_masuk || "";
+  el("petugasKeluar").value = slot.petugas_keluar || "";
+  el("atasIzin").value = slot.atas_izin || "";
+  el("notes").value = slot.notes || "";
+  el("exceptionPreset").value = "";
+  setEditorChangeNote("");
+  if (cleanText(slot.notes).includes("[Masalah]")) {
+    el("exceptionAck").style.display = "block";
+    el("exceptionAck").textContent = `Catatan pengecualian sudah ada di slot ini.`;
+  } else {
+    el("exceptionAck").style.display = "none";
+    el("exceptionAck").textContent = "";
+  }
+  const recordWarning = recordOnlyWarning(slot);
+  el("recordWarning").style.display = recordWarning ? "block" : "none";
+  el("recordWarning").textContent = recordWarning;
+  el("slotInfoBox").open = !hasSlotHistory(slot) || !cleanText(slot.status_isi);
+  renderProductRuleState(slot);
+  renderQuickActionState(slot);
+}
+
+function applyExceptionPreset() {
+  const preset = cleanText(el("exceptionPreset").value);
+  if (!preset) return;
+  const current = cleanText(el("notes").value);
+  const tagged = `[Masalah] ${preset}`;
+  if (!current.toLowerCase().includes(tagged.toLowerCase())) {
+    el("notes").value = current ? `${current} | ${tagged}` : tagged;
+    updateSelectedFromEditor({ rerenderDetail: false });
+  }
+  el("exceptionAck").style.display = "block";
+  el("exceptionAck").textContent = `Dipilih: ${preset}. Sudah ditambahkan ke catatan.`;
+  el("exceptionBox").open = true;
+  el("exceptionPreset").value = preset;
+  setResult(`Catatan masalah ditambahkan: ${preset}`, true);
+}
+
+function updateSelectedFromEditor(options = {}){
+  const rerenderDetail = options.rerenderDetail !== false;
+  const source = options.source || "";
+  const slot = slotState[selectedSlot - 1];
+  if(!slot) return;
+  const previous = { ...slot };
+  slot.status_enum = canonicalStatus(el("statusEnum").value);
+  slot.needs_defrost = normalizeDefrostPreference(el("needsDefrost").value);
+  slot.jam_estimasi_defrost = nonEmpty(strictClockOrEmpty(el("jamEstimasiDefrost").value));
+  slot.jam_estimasi_keluar = nonEmpty(strictClockOrEmpty(el("jamEstimasi").value));
+  slot.partial_out = el("partialOut").value === "yes";
+  slot.jam_keluar_sebagian = nonEmpty(strictClockOrEmpty(el("jamKeluarSebagian").value));
+  slot.jam_estimasi_sisa = nonEmpty(strictClockOrEmpty(el("jamEstimasiSisa").value));
+  slot.petugas_masuk = nonEmpty(cleanText(el("petugasMasuk").value));
+  slot.petugas_keluar = nonEmpty(cleanText(el("petugasKeluar").value));
+  slot.status_isi = nonEmpty(cleanText(el("statusIsi").value));
+  slot.atas_izin = nonEmpty(cleanText(el("atasIzin").value));
+  slot.notes = nonEmpty(cleanText(el("notes").value));
+  renderSummary();
+  renderBoard();
+  if (rerenderDetail) renderDetailEditor();
+  const message = buildEditorChangeMessage(previous, slot, source);
+  if (message) setEditorChangeNote(message);
+  saveDraft();
+}
+
+function lockTimeOnce(slot, dateKey, timeKey){
+  if(slot[timeKey]){
+    setResult(`${timeKey} slot No.${slot.slot_no} sudah tercatat.`, false);
+    return false;
+  }
+  const now = getJakartaNow();
+  slot[timeKey] = now.time;
+  slot[dateKey] = slot[dateKey] || now.date;
+  return true;
+}
+
+function applyQuickAction(action){
+  const slot = slotState[selectedSlot - 1];
+  if(!slot) return;
+
+  if(action==="masuk"){
+    if(lockTimeOnce(slot, "tgl_masuk", "jam_masuk")) slot.status_enum = "PROSES";
+  }
+  if(action==="defros"){
+    if(lockTimeOnce(slot, "tgl_defros", "jam_defros")) slot.status_enum = "PROSES";
+  }
+  if(action==="selesai"){
+    if(lockTimeOnce(slot, "tgl_selesai_dry", "jam_selesai_dry") && slot.status_enum!=="TURUN_PACKING") slot.status_enum = "SIAP_TURUN";
+  }
+  if(action==="turun"){
+    if(lockTimeOnce(slot, "tgl_turun_packing", "jam_turun_packing")) slot.status_enum = "TURUN_PACKING";
+  }
+  if(action==="kosong"){
+    if(slot.jam_masuk || slot.jam_defros || slot.jam_selesai_dry || slot.jam_turun_packing){
+      setResult("Slot ini sudah punya timestamp. Gunakan reset resmi bila perlu.", false);
+      return;
+    }
+    slot.status_enum = "KOSONG";
+  }
+  if(action==="tidak"){
+    if(slot.jam_masuk || slot.jam_defros || slot.jam_selesai_dry || slot.jam_turun_packing){
+      setResult("Slot ini sudah punya timestamp. Gunakan reset resmi bila perlu.", false);
+      return;
+    }
+    slot.status_enum = "TIDAK_DIPAKAI";
+  }
+
+  renderAll();
+  saveDraft();
+}
+
+function buildPayload(){
+  const workDate = el("workDate").value.trim();
+  const teamLabel = buildSuggestedTeamLabel();
+  const handoverTime = strictClockOrEmpty(el("handoverTime").value);
+  const slots = slotState.map((slot)=>{
+    const x = normalizeSlot(slot);
+    IMMUTABLE_TIME_FIELDS.forEach(([dateKey,timeKey])=>{
+      if(x[timeKey] && !x[dateKey]) x[dateKey] = workDate;
+    });
+    x.partial_out = Boolean(x.partial_out);
+    return x;
+  });
+  return {
+    selected_slot: selectedSlot,
+    report_meta: {
+      report_type: "dry_status",
+      prd_date: workDate,
+      timezone: "Asia/Jakarta",
+      team_start: {
+        label: teamLabel,
+        shift: cleanText(el("shift").value),
+        members: splitNames(el("members").value)
+      },
+      team_finish: nonEmpty(cleanText(el("teamFinish").value)),
+      handover_time: nonEmpty(handoverTime),
+      submitted_at_system: new Date().toISOString()
+    },
+    slots
+  };
+}
+
+function summarizeResultPayload(payload){
+  if (typeof payload === "string") return payload;
+  if (!payload || typeof payload !== "object") return "Tersimpan.";
+  if (payload.error) return cleanText(payload.error) || "Gagal, coba lagi.";
+  if (payload.result?.message) {
+    const msg = cleanText(payload.result.message);
+    if (msg === "Telegram + Sheets success") return "Berhasil dikirim.";
+    if (msg === "Telegram sent, Sheets failed. Retry available.") return "Berhasil dikirim, tetapi backup gagal. Coba lagi.";
+    return msg;
+  }
+  if (payload.lock?.lockToken) return "Tim berhasil dibuka.";
+  if (Array.isArray(payload.result)) {
+    const failed = payload.result.filter((item) => item.status !== "success").length;
+    return failed > 0 ? "Retry selesai, sebagian masih gagal." : "Retry berhasil.";
+  }
+  if (payload.ok) return "Tersimpan.";
+  return "Gagal, coba lagi.";
+}
+
+function setResult(payload, ok=true){
+  const box = el("result");
+  box.style.display = "block";
+  box.className = `result ${ok?"ok":"err"}`;
+  box.textContent = summarizeResultPayload(payload);
+}
+
+async function refreshState(){
+  const out = await api("/api/state");
+  serverState = out?.state || {};
+
+  const tReady = Boolean(serverState.integrations?.telegram_ready);
+  const sReady = Boolean(serverState.integrations?.sheets_ready);
+  el("chipTelegram").className = `chip ${tReady?"ok":"bad"}`;
+  el("chipSheets").className = `chip ${sReady?"ok":"bad"}`;
+  el("chipTelegram").textContent = `Telegram: ${tReady?"siap":"belum siap"}`;
+  el("chipSheets").textContent = `Sheets: ${sReady?"siap":"belum siap"}`;
+
+  const reason = serverState.security?.app_locked ? serverState.security.reason : "";
+  isAppLocked = Boolean(reason);
+  el("lockBox").style.display = isAppLocked ? "block" : "none";
+  el("lockBox").textContent = reason;
+
+  ["btnOpen","btnTakeover","btnRetry","btnSubmit"].forEach((id)=>{ el(id).disabled = isAppLocked; });
+
+  const pending = Array.isArray(serverState.pending_queue) ? serverState.pending_queue.length : 0;
+  const lockKey = `${cleanText(el("teamId").value)}__${cleanText(el("workDate").value)}`;
+  const lock = serverState.team_locks?.[lockKey];
+  const sameOwner = Boolean(lock && cleanText(el("lockOwner").value) === cleanText(lock.lockOwner));
+  if (sameOwner) {
+    el("lockToken").value = cleanText(lock.lockToken);
+    el("expectedVersion").value = String(lock.version || 1);
+  } else if (!lock) {
+    el("lockToken").value = "";
+    el("expectedVersion").value = "1";
+  }
+  el("ops").textContent =
+    `Pending queue: ${pending}\n` +
+    `Lock: ${lock ? `${lock.lockOwner} / versi ${lock.version}` : "belum dibuka"}\n` +
+    `Tracked roots: ${Object.keys(serverState.root_messages || {}).length}`;
+}
+
+function renderAll(){
+  renderShiftWorkflow();
+  renderSummary();
+  renderBoard();
+  renderDetailEditor();
+}
+
+function bindEvents(){
+  el("statusEnum").onchange = ()=>{
+    const slot = slotState[selectedSlot - 1];
+    const nextStatus = canonicalStatus(el("statusEnum").value);
+    const currentStatus = canonicalStatus(slot?.status_enum);
+    if ((STATUS_RANK[nextStatus] || 0) < (STATUS_RANK[currentStatus] || 0)) {
+      const ok = window.confirm(`Kondisi slot akan mundur dari ${statusDisplayLabel(currentStatus)} ke ${statusDisplayLabel(nextStatus)}. Lanjutkan?`);
+      if (!ok) {
+        el("statusEnum").value = currentStatus;
+        return;
+      }
+    }
+    updateSelectedFromEditor();
+  };
+  el("needsDefrost").onchange = ()=>updateSelectedFromEditor({ source: "needsDefrost" });
+  el("partialOut").onchange = ()=>updateSelectedFromEditor({ source: "partialOut" });
+  ["petugasMasuk","petugasKeluar","statusIsi","atasIzin","notes"].forEach((id)=>{
+    el(id).oninput = ()=>updateSelectedFromEditor({ rerenderDetail: false });
+  });
+  ["statusIsi","atasIzin","notes"].forEach((id)=>{
+    el(id).addEventListener("blur", ()=>{
+      updateSelectedFromEditor({ source: id });
+    });
+  });
+  ["jamEstimasi","jamEstimasiDefrost","jamKeluarSebagian","jamEstimasiSisa"].forEach((id)=>{
+    el(id).addEventListener("input", ()=>{
+      const sanitized = sanitizeClockInput(el(id).value);
+      if (el(id).value !== sanitized) {
+        el(id).value = sanitized;
+      }
+      saveDraft();
+    });
+  });
+  el("jamEstimasi").onblur = ()=>{
+    const before = cleanText(el("jamEstimasi").value);
+    const strict = strictClockOrEmpty(before);
+    el("jamEstimasi").value = strict;
+    if (!strict && before !== "") {
+      setResult("Estimasi Keluar harus format jam yang valid, misalnya 14:30.", false);
+    }
+    updateSelectedFromEditor();
+  };
+  el("jamEstimasiDefrost").onblur = ()=>{
+    const before = cleanText(el("jamEstimasiDefrost").value);
+    const strict = strictClockOrEmpty(before);
+    el("jamEstimasiDefrost").value = strict;
+    if (!strict && before !== "") {
+      setResult("Estimasi selesai defrost harus format jam yang valid, misalnya 14:30.", false);
+    }
+    updateSelectedFromEditor();
+  };
+  el("jamKeluarSebagian").onblur = ()=>{
+    const before = cleanText(el("jamKeluarSebagian").value);
+    const strict = strictClockOrEmpty(before);
+    el("jamKeluarSebagian").value = strict;
+    if (!strict && before !== "") {
+      setResult("Jam keluar sebagian harus format jam yang valid, misalnya 14:30.", false);
+    }
+    updateSelectedFromEditor();
+  };
+  el("jamEstimasiSisa").onblur = ()=>{
+    const before = cleanText(el("jamEstimasiSisa").value);
+    const strict = strictClockOrEmpty(before);
+    el("jamEstimasiSisa").value = strict;
+    if (!strict && before !== "") {
+      setResult("Estimasi selesai sisa harus format jam yang valid, misalnya 14:30.", false);
+    }
+    updateSelectedFromEditor();
+  };
+
+  ["petugasMasuk","petugasKeluar","atasIzin","lockOwner","members"].forEach((id)=>{
+    el(id).addEventListener("blur", ()=>rememberNamesFromText(el(id).value));
+  });
+
+  ["workDate","shift","lockOwner","members","teamFinish","handoverTime","teamId"].forEach((id)=>{
+    const node = el(id);
+    node.addEventListener("input", ()=>{
+      if (id === "handoverTime") {
+        const sanitized = sanitizeClockInput(node.value);
+        if (node.value !== sanitized) {
+          node.value = sanitized;
+        }
+      }
+      saveDraft();
+    });
+  });
+
+  ["workDate","lockOwner","teamId"].forEach((id)=>{
+    el(id).addEventListener("change", async ()=>{
+      saveDraft();
+      await refreshState();
+    });
+  });
+
+  el("handoverTime").addEventListener("blur", ()=>{
+    const before = cleanText(el("handoverTime").value);
+    const strict = strictClockOrEmpty(before);
+    el("handoverTime").value = strict;
+    if (!strict && before !== "") {
+      setResult("Jam Handover harus format jam yang valid, misalnya 14:30.", false);
+    }
+    saveDraft();
+  });
+
+  el("exceptionPreset").onchange = applyExceptionPreset;
+  el("actPrimary").onclick = ()=>{
+    const action = cleanText(el("actPrimary").dataset.action);
+    if (action) applyQuickAction(action);
+  };
+  el("actMasuk").onclick = ()=>applyQuickAction("masuk");
+  el("actDefros").onclick = ()=>applyQuickAction("defros");
+  el("actSelesai").onclick = ()=>applyQuickAction("selesai");
+  el("actTurun").onclick = ()=>applyQuickAction("turun");
+  el("actKosong").onclick = ()=>applyQuickAction("kosong");
+  el("actTidak").onclick = ()=>applyQuickAction("tidak");
+  el("nowMasuk").onclick = ()=>applyQuickAction("masuk");
+  el("nowDefros").onclick = ()=>applyQuickAction("defros");
+  el("nowSelesai").onclick = ()=>applyQuickAction("selesai");
+  el("nowTurun").onclick = ()=>applyQuickAction("turun");
+
+  el("btnOpen").onclick = async ()=>{
+    const out = await api("/api/open", {
+      teamId: cleanText(el("teamId").value),
+      workDate: cleanText(el("workDate").value),
+      lockOwner: cleanText(el("lockOwner").value)
+    });
+    if(out.ok && out.lock){
+      el("lockToken").value = out.lock.lockToken || "";
+      el("expectedVersion").value = out.lock.version || 1;
+      setResult(out, true);
+    } else {
+      setResult(out, false);
+    }
+    await refreshState();
+  };
+
+  el("btnTakeover").onclick = async ()=>{
+    const out = await api("/api/takeover", {
+      teamId: cleanText(el("teamId").value),
+      workDate: cleanText(el("workDate").value),
+      lockOwner: cleanText(el("lockOwner").value)
+    });
+    if(out.ok && out.lock){
+      el("lockToken").value = out.lock.lockToken || "";
+      el("expectedVersion").value = out.lock.version || 1;
+      setResult(out, true);
+    } else {
+      setResult(out, false);
+    }
+    await refreshState();
+  };
+
+  el("btnRetry").onclick = async ()=>{
+    if(isAppLocked) return setResult("Aplikasi terkunci. Lengkapi integrasi terlebih dahulu.", false);
+    const out = await api("/api/retry", {});
+    setResult(out, Boolean(out.ok));
+    await refreshState();
+  };
+
+  el("btnSubmit").onclick = async ()=>{
+    if(isAppLocked) return setResult("Aplikasi terkunci. Lengkapi integrasi terlebih dahulu.", false);
+    updateSelectedFromEditor();
+    rememberNamesFromText(el("petugasMasuk").value);
+    rememberNamesFromText(el("petugasKeluar").value);
+    rememberNamesFromText(el("atasIzin").value);
+    const out = await api("/api/submit", {
+      payload: buildPayload(),
+      teamId: cleanText(el("teamId").value),
+      workDate: cleanText(el("workDate").value),
+      lockOwner: cleanText(el("lockOwner").value),
+      lockToken: cleanText(el("lockToken").value),
+      expectedVersion: Number(cleanText(el("expectedVersion").value) || 1)
+    });
+    setResult(out, Boolean(out.ok && out.result && out.result.status !== "failed"));
+    await refreshState();
+  };
+
+  el("btnClearDraft").onclick = ()=>{
+    clearDraft();
+    setResult("Draft lokal dihapus. Muat ulang halaman bila ingin mulai dari sample awal.", true);
+  };
+}
+
+async function init(){
+  bindEvents();
+  loadRecentNames();
+  renderRecentNameOptions();
+  setDraftChip("", false);
+
+  const sample = await api("/api/sample");
+  const sampleSlots = Array.isArray(sample?.sample?.slots) ? sample.sample.slots : [];
+  const byNo = {};
+  sampleSlots.forEach((s)=>{ byNo[Number(s.slot_no)] = normalizeSlot(s); });
+  slotState = Array.from({length:11}, (_,idx)=>byNo[idx+1] || emptySlot(idx+1));
+
+  const meta = sample?.sample?.report_meta || {};
+  if(meta?.prd_date) el("workDate").value = cleanText(meta.prd_date);
+  if(meta?.team_start?.shift) el("shift").value = cleanText(meta.team_start.shift);
+  if(Array.isArray(meta?.team_start?.members)) el("members").value = meta.team_start.members.map((x)=>cleanText(x)).join(",");
+  if(meta?.team_finish) el("teamFinish").value = cleanText(meta.team_finish);
+  if(meta?.handover_time) el("handoverTime").value = cleanText(meta.handover_time);
+
+  applyDraft(loadDraft());
+
+  renderAll();
+  saveDraft();
+  await refreshState();
+}
+
+init();
+</script>
+</body>
+</html>
