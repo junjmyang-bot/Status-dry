@@ -1,5 +1,8 @@
 storage/*.json
 .env
+.env.local
+.node-version
+node_modules/
 .venv/
 __pycache__/
 .streamlit/secrets.toml

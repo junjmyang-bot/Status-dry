@@ -1,0 +1,15 @@
+{
+  "name": "status-dry",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dry laporan operator app with Telegram and Sheets integration",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20 <25"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "demo": "node src/demo.js",
+    "retry": "node src/index.js retry"
+  }
+}

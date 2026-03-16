@@ -8,7 +8,7 @@ const config = require('./config');
 const pendingQueue = require('./persistence/pendingQueue');
 const { readJson } = require('./lib/fileStore');
 
-const HOST = '127.0.0.1';
+const HOST = process.env.HOST || '0.0.0.0';
 const PORT = Number(process.env.PORT || 8787);
 
 const ROOT = path.resolve(__dirname, '..');

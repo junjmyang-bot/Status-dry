@@ -25,6 +25,33 @@ Required:
 Optional:
 - `APP_TIMEZONE` (default `Asia/Jakarta`)
 
+## Direct operator deployment
+The correct operator-facing deployment is the Node app itself, not the Streamlit launcher.
+
+Recommended target:
+- Render Web Service
+
+Minimum app settings:
+- Runtime: `Node`
+- Build command: `npm install`
+- Start command: `npm start`
+- Health check path: `/api/state`
+
+Required env vars:
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+- `SHEETS_WEBHOOK_URL`
+
+Recommended persistent storage env vars:
+- `PENDING_QUEUE_FILE=/var/data/pending-queue.json`
+- `ROOT_MESSAGE_FILE=/var/data/root-messages.json`
+- `TEAM_LOCK_FILE=/var/data/team-locks.json`
+- `TIME_INTEGRITY_FILE=/var/data/time-integrity.json`
+
+This repo includes:
+- `package.json` for Node deployment
+- `render.yaml` for Render blueprint deployment
+
 ## Streamlit launcher
 This repo now includes a minimal Streamlit launcher:
 

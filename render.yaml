@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: status-dry
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/state
+    envVars:
+      - key: APP_TIMEZONE
+        value: Asia/Jakarta
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: SHEETS_WEBHOOK_URL
+        sync: false
+      - key: PENDING_QUEUE_FILE
+        value: /var/data/pending-queue.json
+      - key: ROOT_MESSAGE_FILE
+        value: /var/data/root-messages.json
+      - key: TEAM_LOCK_FILE
+        value: /var/data/team-locks.json
+      - key: TIME_INTEGRITY_FILE
+        value: /var/data/time-integrity.json
+    disk:
+      name: status-dry-data
+      mountPath: /var/data
+      sizeGB: 1
