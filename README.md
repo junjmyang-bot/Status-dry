@@ -39,11 +39,13 @@ If you connect this repo to Streamlit:
    - `TELEGRAM_BOT_TOKEN`
    - `TELEGRAM_CHAT_ID`
    - `SHEETS_WEBHOOK_URL`
+   - `PUBLIC_APP_URL`
 3. keep using `src/server.js` as the real dry app backend
 
 Note:
 - current UI is still a Node app
 - Streamlit here is a launcher/diagnostic wrapper, not a rewrite of the dry app UI
+- if `PUBLIC_APP_URL` is set, the operator button opens that public URL instead of localhost
 
 ## CLI usage
 ### 1) Open Team

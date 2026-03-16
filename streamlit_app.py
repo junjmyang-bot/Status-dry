@@ -10,8 +10,8 @@ from urllib.request import urlopen
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parent
-APP_URL = "http://127.0.0.1:8787"
-STATE_URL = f"{APP_URL}/api/state"
+LOCAL_APP_URL = "http://127.0.0.1:8787"
+LOCAL_STATE_URL = f"{LOCAL_APP_URL}/api/state"
 REQUIRED_SECRETS = [
     "TELEGRAM_BOT_TOKEN",
     "TELEGRAM_CHAT_ID",
@@ -20,7 +20,7 @@ REQUIRED_SECRETS = [
 
 
 def apply_streamlit_secrets():
-    for key in REQUIRED_SECRETS + ["APP_TIMEZONE"]:
+    for key in REQUIRED_SECRETS + ["APP_TIMEZONE", "PUBLIC_APP_URL"]:
         if key in st.secrets and not os.environ.get(key):
             os.environ[key] = str(st.secrets[key])
 
@@ -41,7 +41,7 @@ def is_port_open(host: str, port: int) -> bool:
 
 def app_ready() -> bool:
     try:
-        with urlopen(STATE_URL, timeout=1.5) as response:
+        with urlopen(LOCAL_STATE_URL, timeout=1.5) as response:
             return response.status == 200
     except (URLError, OSError):
         return False
@@ -94,6 +94,10 @@ def secret_status():
     return rows
 
 
+def public_app_url() -> str:
+    return str(os.environ.get("PUBLIC_APP_URL", "")).strip()
+
+
 st.set_page_config(
     page_title="Status Dry Launcher",
     page_icon="🧾",
@@ -111,16 +115,22 @@ with st.container(border=True):
         "Halaman ini hanya menyiapkan environment Streamlit dan memeriksa apakah server dry sudah siap."
     )
 
-ok, state = ensure_server()
-
-if ok:
-    st.success("Server laporan dry siap.")
-    st.link_button("Buka aplikasi dry", APP_URL, use_container_width=True)
+deployed_url = public_app_url()
+if deployed_url:
+    st.success("Link operator sudah diarahkan ke public app.")
+    st.link_button("Buka aplikasi dry", deployed_url, use_container_width=True)
+    ok, state = False, "public_link"
 else:
-    if state == "missing_node":
-        st.error("Node.js tidak ditemukan di environment ini. Pastikan package `nodejs` tersedia.")
+    ok, state = ensure_server()
+
+    if ok:
+        st.success("Server laporan dry siap.")
+        st.link_button("Buka aplikasi dry", LOCAL_APP_URL, use_container_width=True)
     else:
-        st.warning("Server dry belum siap. Tunggu sebentar lalu refresh halaman ini.")
+        if state == "missing_node":
+            st.error("Node.js tidak ditemukan di environment ini. Pastikan package `nodejs` tersedia.")
+        else:
+            st.warning("Server dry belum siap. Tunggu sebentar lalu refresh halaman ini.")
 
 with st.expander("Status environment", expanded=True):
     st.dataframe(secret_status(), use_container_width=True, hide_index=True)
@@ -129,7 +139,8 @@ with st.expander("Status environment", expanded=True):
             [
                 "Main file: streamlit_app.py",
                 "Node entry: src/server.js",
-                "App URL: http://127.0.0.1:8787",
+                f"Operator app URL: {deployed_url or LOCAL_APP_URL}",
+                f"Mode: {'public_link' if deployed_url else 'local_launcher'}",
                 f"Server ready: {'yes' if ok else 'no'}",
             ]
         ),
@@ -140,5 +151,6 @@ with st.expander("Catatan deployment", expanded=False):
     st.markdown(
         "- Streamlit ini berfungsi sebagai launcher/diagnostic untuk app Node.\n"
         "- Secrets yang perlu diisi di Streamlit: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `SHEETS_WEBHOOK_URL`.\n"
-        "- Jika deploy target tidak mengizinkan akses ke server Node internal, perlu host web terpisah atau proxy tambahan."
+        "- Untuk operator, tambahkan juga `PUBLIC_APP_URL` agar tombol membuka public app, bukan localhost.\n"
+        "- Jika `PUBLIC_APP_URL` tidak diisi, launcher akan fallback ke mode local dev (`127.0.0.1:8787`)."
     )
