@@ -411,6 +411,10 @@ def get_now_jakarta():
     return now.date().isoformat(), now.strftime("%H:%M")
 
 
+def fill_time_now(widget_key):
+    st.session_state[widget_key] = get_now_jakarta()[1]
+
+
 def set_feedback(message, ok=True):
     st.session_state["feedback_text"] = message
     st.session_state["feedback_ok"] = ok
@@ -849,6 +853,21 @@ def render_board():
                     st.rerun()
 
 
+def render_time_input_row(label, widget_key):
+    input_col, button_col = st.columns([4, 1])
+    with input_col:
+        st.text_input(label, key=widget_key, placeholder="HH:mm")
+    with button_col:
+        st.write("")
+        st.button(
+            "Sekarang",
+            key=f"{widget_key}_now",
+            use_container_width=True,
+            on_click=fill_time_now,
+            args=(widget_key,),
+        )
+
+
 def render_detail():
     sync_editor_widgets_from_selected_slot()
     report = st.session_state["report"]
@@ -899,18 +918,18 @@ def render_detail():
         st.caption("Bagian ini untuk melengkapi catatan. Status papan tetap mengikuti aksi cepat.")
         c1, c2 = st.columns(2)
         with c1:
-            st.text_input("Jam Masuk", key="jam_masuk", placeholder="HH:mm")
+            render_time_input_row("Jam Masuk", "jam_masuk")
             if st.session_state["needs_defrost"] == "yes":
-                st.text_input("Jam Defrost", key="jam_defros", placeholder="HH:mm")
+                render_time_input_row("Jam Defrost", "jam_defros")
                 st.text_input("Estimasi Selesai Defrost", key="jam_estimasi_defrost", placeholder="HH:mm")
             st.text_input("Estimasi Keluar", key="jam_estimasi_keluar", placeholder="HH:mm")
-            st.text_input("Jam Selesai Dry", key="jam_selesai_dry", placeholder="HH:mm")
+            render_time_input_row("Jam Selesai Dry", "jam_selesai_dry")
         with c2:
             st.selectbox("Sebagian Keluar?", options=["no", "yes"], format_func=lambda x: "Ya" if x == "yes" else "Tidak", key="partial_out")
             if st.session_state["partial_out"] == "yes":
                 st.text_input("Jam Keluar Sebagian", key="jam_keluar_sebagian", placeholder="HH:mm")
                 st.text_input("Estimasi Selesai Sisa", key="jam_estimasi_sisa", placeholder="HH:mm")
-            st.text_input("Jam Turun Packing", key="jam_turun_packing", placeholder="HH:mm")
+            render_time_input_row("Jam Turun Packing", "jam_turun_packing")
 
         st.text_input("Petugas Masuk", key="petugas_masuk")
         st.text_input("Petugas Keluar", key="petugas_keluar")
