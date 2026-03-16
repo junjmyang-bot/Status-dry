@@ -325,7 +325,7 @@ def sync_widgets_from_report():
 
     st.session_state["status_enum"] = slot["status_enum"]
     st.session_state["status_isi"] = clean_text(slot.get("status_isi"))
-    st.session_state["needs_defrost"] = "yes" if slot.get("needs_defrost") is not False else "no"
+    st.session_state["needs_defrost"] = "yes" if slot.get("needs_defrost") is True else "no"
     st.session_state["jam_masuk"] = clean_text(slot.get("jam_masuk"))
     st.session_state["jam_defros"] = clean_text(slot.get("jam_defros"))
     st.session_state["jam_estimasi_defrost"] = clean_text(slot.get("jam_estimasi_defrost"))
@@ -792,7 +792,7 @@ def render_detail():
                     apply_quick_action(action)
                     st.rerun()
     else:
-        st.caption("Tidak ada aksi cepat untuk slot ini. Gunakan koreksi manual hanya bila perlu.")
+        st.caption("Tidak ada aksi cepat untuk slot ini.")
 
     danger_actions = available_danger_actions(slot)
     if danger_actions:
@@ -803,9 +803,6 @@ def render_detail():
                     if st.button(quick_action_label(action), key=f"risk_{action}", use_container_width=True):
                         apply_quick_action(action)
                         st.rerun()
-
-    with st.expander("Koreksi status manual", expanded=False):
-        st.selectbox("Kondisi Slot", STATUS_OPTIONS, index=STATUS_OPTIONS.index(st.session_state["status_enum"]), key="status_enum")
 
     with st.expander("Info produk / rule", expanded=True):
         st.text_input("Produk di Slot", key="status_isi")
@@ -818,8 +815,8 @@ def render_detail():
         if slot.get("partial_out"):
             st.warning("SEBAGIAN KELUAR, SISA MASIH DRY")
 
-    with st.expander("Catatan waktu / detail record", expanded=True):
-        st.caption("Bagian ini untuk melengkapi catatan. Status papan tetap mengikuti aksi cepat atau koreksi status manual.")
+    with st.expander("Catatan waktu / detail record", expanded=False):
+        st.caption("Bagian ini untuk melengkapi catatan. Status papan tetap mengikuti aksi cepat.")
         c1, c2 = st.columns(2)
         with c1:
             st.text_input("Jam Masuk", key="jam_masuk", placeholder="HH:mm")
@@ -882,7 +879,7 @@ def render_header_controls(server_state):
 
     lock = st.session_state.get("lock") or {}
     if lock:
-        st.caption(f"Lock aktif: {lock.get('lockOwner')} | versi {lock.get('version')}")
+        st.caption(f"Lock aktif: {lock.get('lockOwner')}")
 
 
 def render_feedback():
