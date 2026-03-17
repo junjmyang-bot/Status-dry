@@ -314,6 +314,7 @@ def ensure_app_state():
         st.session_state["team_id"] = "dry-team-1"
         st.session_state["_pending_editor_sync"] = True
         st.session_state["_editor_slot_no"] = None
+        st.session_state["_partial_branch_slot"] = None
         sync_header_widgets_from_report(force=True)
 
 
@@ -472,6 +473,9 @@ def apply_quick_action(action):
         slot["jam_keluar_sebagian"] = None
         slot["partial_unload_content"] = None
         slot["partial_unload_note"] = None
+    elif action == "sebagian_turun":
+        st.session_state["_partial_branch_slot"] = slot["slot_no"]
+        return
     elif action == "turun" and lock_time_once(slot, "tgl_turun_packing", "jam_turun_packing"):
         slot["status_enum"] = "TURUN_PACKING"
     elif action == "kosong":
@@ -486,6 +490,7 @@ def apply_quick_action(action):
         slot["status_enum"] = "TIDAK_DIPAKAI"
 
     st.session_state["_pending_editor_sync"] = True
+    st.session_state["_partial_branch_slot"] = None
     save_draft()
 
 
@@ -522,10 +527,14 @@ def operator_state(slot):
 def state_helper_text(slot):
     state = operator_state(slot)
     if state == "MENUNGGU_TURUN":
+        if slot.get("partial_out"):
+            return "Sebagian turun dicatat. Pilih tindakan berikutnya."
         return "Dry selesai, pilih tindakan berikutnya."
     if state == "DEFROST":
         return "Lengkapi defrost lalu lanjut ke dry."
     if state == "SEDANG_DRY_TAMBAHAN":
+        if slot.get("partial_out"):
+            return "Sebagian turun dicatat. Sisa masih dry."
         return "Tambahan dry sedang berjalan."
     if state == "LAGI_KELUARKAN":
         return "Proses turun packing sedang berjalan."
@@ -636,7 +645,7 @@ def action_type_badge(slot):
 def action_priority_text(slot):
     action = current_action_type(slot)
     if action == "PILIH_TINDAKAN":
-        return "Pilih Lanjut Dry atau Turun Semua"
+        return "Pilih Lanjut Dry, Turun Semua, atau Sebagian Turun"
     if action == "MULAI_DRY":
         return "Mulai dry sekarang"
     if action == "MULAI_DEFROST":
@@ -669,7 +678,48 @@ def product_label(slot):
     return clean_text(slot.get("status_isi")) or "-"
 
 
+def partial_branch_active(slot):
+    return st.session_state.get("_partial_branch_slot") == slot["slot_no"]
+
+
+def save_partial_branch(slot):
+    partial_time = non_empty(normalize_clock(st.session_state.get("jam_keluar_sebagian")))
+    partial_content = non_empty(st.session_state.get("partial_unload_content"))
+    partial_note = non_empty(st.session_state.get("partial_unload_note"))
+
+    if not partial_time:
+        set_feedback("Waktu Sebagian Turun wajib diisi.", ok=False)
+        return False
+    if not partial_content:
+        set_feedback("Isi Sebagian Turun wajib diisi.", ok=False)
+        return False
+
+    work_date = (
+        st.session_state["work_date"].isoformat()
+        if isinstance(st.session_state.get("work_date"), date)
+        else clean_text(st.session_state.get("work_date"))
+    )
+
+    slot["partial_out"] = True
+    slot["jam_keluar_sebagian"] = partial_time
+    slot["partial_unload_content"] = partial_content
+    slot["partial_unload_note"] = partial_note
+    slot["status_enum"] = "DRY_ULANG"
+    slot["tgl_selesai_dry"] = None
+    slot["jam_selesai_dry"] = None
+    slot["jam_turun_packing"] = None
+    slot["tgl_turun_packing"] = None
+
+    st.session_state["_partial_branch_slot"] = None
+    st.session_state["_pending_editor_sync"] = True
+    save_draft()
+    set_feedback("Sebagian turun dicatat. Slot kembali ke tambahan dry.", ok=True)
+    return True
+
+
 def short_context_text(slot):
+    if slot.get("partial_out") and operator_state(slot) in {"SEDANG_DRY_TAMBAHAN", "MENUNGGU_TURUN"}:
+        return "Sebagian turun dicatat"
     helper = state_helper_text(slot)
     if helper:
         return helper
@@ -691,12 +741,16 @@ def summary_item_markup(slot, emphasize_action=False):
     action_badge = ""
     if emphasize_action and current_action_type(slot):
         action_badge = f'<div class="sd-mini-badge">{html.escape(action_type_badge(slot))}</div>'
+    partial_note = ""
+    if slot.get("partial_out") and operator_state(slot) in {"SEDANG_DRY_TAMBAHAN", "MENUNGGU_TURUN"}:
+        partial_note = '<div class="sd-mini-state">Sebagian turun dicatat</div>'
     return (
         '<div class="sd-mini-card">'
         f"{action_badge}"
         f'<div class="sd-mini-title">{html.escape(title)}</div>'
         f'<div class="sd-mini-meta">{html.escape(shift_line)}</div>'
         f'<div class="sd-mini-time">{html.escape(timing)}</div>'
+        f"{partial_note}"
         f'<div class="sd-mini-action">{html.escape(context)}</div>'
         "</div>"
     )
@@ -709,6 +763,9 @@ def board_card_markup(slot):
     check_now = action_priority_text(slot) if current_action_type(slot) else short_context_text(slot)
     tone = " action" if current_action_type(slot) else (" passive" if slot_group(slot) != "active" else "")
     badge = action_type_badge(slot) if current_action_type(slot) else slot_group_label(slot)
+    partial_note = ""
+    if slot.get("partial_out") and operator_state(slot) in {"SEDANG_DRY_TAMBAHAN", "MENUNGGU_TURUN"}:
+        partial_note = '<div class="sd-board-note">Sebagian turun dicatat</div>'
     return (
         f'<div class="sd-board-card{tone}">'
         f'<div class="sd-board-badge">{html.escape(badge)}</div>'
@@ -716,6 +773,7 @@ def board_card_markup(slot):
         f'<div class="sd-board-product">{html.escape(product if product != "-" else "Belum ada produk")}</div>'
         f'<div class="sd-board-state">{html.escape(state)}</div>'
         f'<div class="sd-board-time">{html.escape(timing)}</div>'
+        f"{partial_note}"
         f'<div class="sd-board-check">{html.escape(check_now)}</div>'
         "</div>"
     )
@@ -742,6 +800,7 @@ def quick_action_label(action):
         "selesai_tambahan": "Selesai Dry Tambahan",
         "lanjut_dry": "Lanjut Dry",
         "turun_semua": "Turun Semua",
+        "sebagian_turun": "Sebagian Turun",
         "kosong": "Set kosong",
         "tidak": "Set tidak dipakai",
     }.get(action, "")
@@ -750,7 +809,7 @@ def quick_action_label(action):
 def quick_action_disabled_reason(slot, action):
     if action in {"defros", "masuk"} and product_label(slot) == "-":
         return "Isi produk dulu sebelum mulai dry."
-    if action in {"lanjut_dry", "turun_semua"} and not clean_text(slot.get("jam_selesai_dry")):
+    if action in {"lanjut_dry", "turun_semua", "sebagian_turun"} and not clean_text(slot.get("jam_selesai_dry")):
         return "Jam Selesai Setting Dry belum tercatat."
     return ""
 
@@ -758,7 +817,7 @@ def quick_action_disabled_reason(slot, action):
 def visible_quick_actions(slot):
     primary = quick_action_primary(slot)
     if operator_state(slot) == "MENUNGGU_TURUN":
-        return ["lanjut_dry", "turun_semua"]
+        return ["lanjut_dry", "turun_semua", "sebagian_turun"]
     return [primary] if primary else []
 
 
@@ -850,6 +909,7 @@ def submit_report():
 def select_slot(slot_no: int):
     st.session_state["report"]["selected_slot"] = slot_no
     st.session_state["_pending_editor_sync"] = True
+    st.session_state["_partial_branch_slot"] = None
 
 
 def render_summary():
@@ -970,6 +1030,10 @@ def saved_value_lines(slot):
     for label, value in mapping:
         if clean_text(value):
             lines.append(f"{label}: {value}")
+    if slot.get("partial_out"):
+        partial_bits = [clean_text(slot.get("jam_keluar_sebagian")), clean_text(slot.get("partial_unload_content"))]
+        partial_text = " | ".join([bit for bit in partial_bits if bit]) or "Sebagian turun dicatat"
+        lines.append(f"Sebagian Turun: {partial_text}")
     return lines
 
 
@@ -1000,6 +1064,7 @@ def render_detail():
     slot = report["slots"][report["selected_slot"] - 1]
     visibility = field_visibility(slot)
     state = operator_state(slot)
+    partial_mode = partial_branch_active(slot)
     st.markdown("### Detail slot")
     st.markdown(
         f"""
@@ -1048,6 +1113,24 @@ def render_detail():
                 st.info("Defrost tidak diperlukan lagi, tetapi catatan defrost lama tetap tersimpan.")
             else:
                 st.info("Jalur slot ini tanpa defrost.")
+
+    if partial_mode:
+        with st.container(border=True):
+            st.markdown("**Sebagian Turun**")
+            st.caption("Catat sebagian produk yang turun, lalu sisa slot lanjut ke tambahan dry.")
+            render_time_input_row("Waktu Sebagian Turun", "jam_keluar_sebagian")
+            st.text_input("Isi Sebagian Turun", key="partial_unload_content")
+            st.text_input("Catatan Partial", key="partial_unload_note")
+            action_cols = st.columns(2)
+            with action_cols[0]:
+                if st.button("Simpan Sebagian Turun", key="save_partial_branch", type="primary", use_container_width=True):
+                    sync_report_from_widgets()
+                    if save_partial_branch(slot):
+                        st.rerun()
+            with action_cols[1]:
+                if st.button("Batal", key="cancel_partial_branch", use_container_width=True):
+                    st.session_state["_partial_branch_slot"] = None
+                    st.rerun()
 
     with st.expander("Catatan waktu / detail record", expanded=False):
         st.caption("Lengkapi hanya field yang memang dipakai pada status sekarang.")
@@ -1287,6 +1370,12 @@ def main():
           margin-top: 4px;
           font-size: 0.84rem;
           color: #536476;
+        }
+        .sd-board-note {
+          margin-top: 6px;
+          font-size: 0.78rem;
+          font-weight: 800;
+          color: #0f6c5a;
         }
         .sd-board-check {
           margin-top: 7px;

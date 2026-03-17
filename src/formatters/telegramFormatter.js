@@ -192,7 +192,7 @@ function buildTelegramUpdateReply(report) {
     ].join('\n');
   }
 
-  return [
+  const lines = [
     '@SOI_DRY_Laporan',
     'Laporan sudah diperbarui.',
     '',
@@ -201,7 +201,13 @@ function buildTelegramUpdateReply(report) {
     `Status: ${statusLabel(slot)}`,
     `Petugas: ${petugasLabel(slot)}`,
     `Izin: ${izinLabel(slot)}`
-  ].join('\n');
+  ];
+
+  if (slot.partial_out && cleanText(slot.status_enum) === 'DRY_ULANG') {
+    lines.push('Catatan: sebagian turun dicatat');
+  }
+
+  return lines.join('\n');
 }
 
 function buildTelegramMessages(report) {
