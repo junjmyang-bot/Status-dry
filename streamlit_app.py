@@ -31,11 +31,11 @@ STATUS_OPTIONS = [
 STATUS_LABELS = {
     "KOSONG": "Kosong",
     "TIDAK_DIPAKAI": "Tidak dipakai / rusak",
-    "PROSES": "Sedang diproses",
-    "SIAP_TURUN": "Siap turun",
-    "SELESAI_DRY": "Selesai dry",
-    "TURUN_PACKING": "Sudah turun ke packing",
-    "DRY_ULANG": "Dry ulang",
+    "PROSES": "Lagi Isi",
+    "SIAP_TURUN": "Menunggu Turun",
+    "SELESAI_DRY": "Menunggu Turun",
+    "TURUN_PACKING": "Lagi Keluarkan",
+    "DRY_ULANG": "Sedang Dry",
 }
 
 
@@ -207,6 +207,8 @@ def empty_slot(slot_no: int):
         "partial_out": False,
         "jam_keluar_sebagian": None,
         "jam_estimasi_sisa": None,
+        "partial_unload_content": None,
+        "partial_unload_note": None,
         "petugas_keluar": None,
         "tgl_turun_packing": None,
         "jam_turun_packing": None,
@@ -254,6 +256,8 @@ def normalize_slot(slot):
         "status_isi",
         "atas_izin",
         "notes",
+        "partial_unload_content",
+        "partial_unload_note",
     ]:
         base[key] = non_empty(base.get(key))
     base["needs_defrost"] = normalize_defrost(base.get("needs_defrost"))
@@ -355,6 +359,8 @@ def sync_editor_widgets_from_selected_slot(force=False):
     st.session_state["partial_out"] = "yes" if slot.get("partial_out") else "no"
     st.session_state["jam_keluar_sebagian"] = clean_text(slot.get("jam_keluar_sebagian"))
     st.session_state["jam_estimasi_sisa"] = clean_text(slot.get("jam_estimasi_sisa"))
+    st.session_state["partial_unload_content"] = clean_text(slot.get("partial_unload_content"))
+    st.session_state["partial_unload_note"] = clean_text(slot.get("partial_unload_note"))
     st.session_state["jam_turun_packing"] = clean_text(slot.get("jam_turun_packing"))
     st.session_state["petugas_masuk"] = clean_text(slot.get("petugas_masuk"))
     st.session_state["petugas_keluar"] = clean_text(slot.get("petugas_keluar"))
@@ -388,11 +394,18 @@ def sync_report_from_widgets():
     slot["partial_out"] = st.session_state["partial_out"] == "yes"
     slot["jam_keluar_sebagian"] = non_empty(normalize_clock(st.session_state["jam_keluar_sebagian"]))
     slot["jam_estimasi_sisa"] = non_empty(normalize_clock(st.session_state["jam_estimasi_sisa"]))
+    slot["partial_unload_content"] = non_empty(st.session_state["partial_unload_content"])
+    slot["partial_unload_note"] = non_empty(st.session_state["partial_unload_note"])
     slot["jam_turun_packing"] = non_empty(normalize_clock(st.session_state["jam_turun_packing"]))
     slot["petugas_masuk"] = non_empty(st.session_state["petugas_masuk"])
     slot["petugas_keluar"] = non_empty(st.session_state["petugas_keluar"])
     slot["atas_izin"] = non_empty(st.session_state["atas_izin"])
     slot["notes"] = non_empty(st.session_state["notes"])
+
+    if slot.get("jam_selesai_dry") and not slot.get("jam_turun_packing"):
+        slot["status_enum"] = "SIAP_TURUN"
+    if slot.get("jam_turun_packing"):
+        slot["status_enum"] = "TURUN_PACKING"
 
     for date_key, time_key in [
         ("tgl_masuk", "jam_masuk"),
@@ -441,6 +454,24 @@ def apply_quick_action(action):
     elif action == "selesai" and lock_time_once(slot, "tgl_selesai_dry", "jam_selesai_dry"):
         if slot["status_enum"] != "TURUN_PACKING":
             slot["status_enum"] = "SIAP_TURUN"
+    elif action == "selesai_tambahan" and lock_time_once(slot, "tgl_selesai_dry", "jam_selesai_dry"):
+        slot["status_enum"] = "SIAP_TURUN"
+    elif action == "lanjut_dry":
+        slot["status_enum"] = "DRY_ULANG"
+        slot["tgl_selesai_dry"] = None
+        slot["jam_selesai_dry"] = None
+        slot["tgl_turun_packing"] = None
+        slot["jam_turun_packing"] = None
+        slot["partial_out"] = False
+        slot["jam_keluar_sebagian"] = None
+        slot["partial_unload_content"] = None
+        slot["partial_unload_note"] = None
+    elif action == "turun_semua" and lock_time_once(slot, "tgl_turun_packing", "jam_turun_packing"):
+        slot["status_enum"] = "TURUN_PACKING"
+        slot["partial_out"] = False
+        slot["jam_keluar_sebagian"] = None
+        slot["partial_unload_content"] = None
+        slot["partial_unload_note"] = None
     elif action == "turun" and lock_time_once(slot, "tgl_turun_packing", "jam_turun_packing"):
         slot["status_enum"] = "TURUN_PACKING"
     elif action == "kosong":
@@ -469,21 +500,43 @@ def effective_defrost_required(slot):
     return True
 
 
-def process_stage(slot):
-    if slot.get("status_enum") != "PROSES":
-        return ""
-    if effective_defrost_required(slot) and (slot.get("jam_defros") or slot.get("tgl_defros")):
+def operator_state(slot):
+    status = slot.get("status_enum")
+    if status == "TIDAK_DIPAKAI":
+        return "TIDAK_DIPAKAI"
+    if status == "KOSONG":
+        return "KOSONG"
+    if status == "TURUN_PACKING" or slot.get("jam_turun_packing"):
+        return "LAGI_KELUARKAN"
+    if status == "DRY_ULANG":
+        return "SEDANG_DRY_TAMBAHAN"
+    if status in {"SIAP_TURUN", "SELESAI_DRY"} or (slot.get("jam_selesai_dry") and not slot.get("jam_turun_packing")):
+        return "MENUNGGU_TURUN"
+    if effective_defrost_required(slot) and (slot.get("jam_defros") or slot.get("tgl_defros")) and not slot.get("jam_masuk"):
         return "DEFROST"
     if slot.get("jam_masuk") or slot.get("tgl_masuk"):
-        return "LAGI_DIISI"
-    return "PROSES"
+        return "SEDANG_DRY"
+    return "LAGI_ISI"
+
+
+def state_helper_text(slot):
+    state = operator_state(slot)
+    if state == "MENUNGGU_TURUN":
+        return "Dry selesai, pilih tindakan berikutnya."
+    if state == "DEFROST":
+        return "Lengkapi defrost lalu lanjut ke dry."
+    if state == "SEDANG_DRY_TAMBAHAN":
+        return "Tambahan dry sedang berjalan."
+    if state == "LAGI_KELUARKAN":
+        return "Proses turun packing sedang berjalan."
+    return ""
 
 
 def slot_group(slot):
     status = slot.get("status_enum")
     if status == "TIDAK_DIPAKAI":
         return "broken"
-    if status in {"KOSONG", "TURUN_PACKING"}:
+    if status == "KOSONG":
         return "nonactive"
     return "active"
 
@@ -498,16 +551,20 @@ def slot_group_label(slot):
 
 
 def slot_state_label(slot):
-    if slot.get("partial_out"):
-        return "SEBAGIAN KELUAR, SISA MASIH DRY"
     status = slot.get("status_enum")
-    if status == "PROSES":
-        stage = process_stage(slot)
-        if stage == "DEFROST":
-            return "Defrost"
-        if stage == "LAGI_DIISI":
-            return "Lagi diisi"
-        return "Sedang dry"
+    state = operator_state(slot)
+    if state == "LAGI_KELUARKAN":
+        return "Lagi Keluarkan"
+    if state == "MENUNGGU_TURUN":
+        return "Menunggu Turun"
+    if state == "DEFROST":
+        return "Defrost"
+    if state == "SEDANG_DRY":
+        return "Sedang Dry"
+    if state == "SEDANG_DRY_TAMBAHAN":
+        return "Sedang Dry Tambahan"
+    if state == "LAGI_ISI":
+        return "Lagi Isi"
     return STATUS_LABELS.get(status, status or "Kosong")
 
 
@@ -531,15 +588,15 @@ def format_duration(total_minutes):
 
 
 def target_clock(slot):
-    if process_stage(slot) == "DEFROST" and effective_defrost_required(slot):
+    if operator_state(slot) == "DEFROST" and effective_defrost_required(slot):
         return slot.get("jam_estimasi_defrost") or ""
-    if slot.get("partial_out") and slot.get("jam_estimasi_sisa"):
-        return slot.get("jam_estimasi_sisa")
     return slot.get("jam_estimasi_keluar") or ""
 
 
 def start_clock(slot):
-    return slot.get("jam_defros") or slot.get("jam_masuk") or ""
+    if operator_state(slot) == "DEFROST":
+        return slot.get("jam_defros") or ""
+    return slot.get("jam_masuk") or slot.get("jam_selesai_dry") or ""
 
 
 def elapsed_or_remaining(slot):
@@ -557,17 +614,17 @@ def elapsed_or_remaining(slot):
 
 def current_action_type(slot):
     status = slot.get("status_enum")
+    state = operator_state(slot)
     now_minutes = clock_minutes(get_now_jakarta()[1])
-    if process_stage(slot) == "DEFROST" and target_clock(slot) and clock_minutes(target_clock(slot)) is not None:
+    if state == "DEFROST" and target_clock(slot) and clock_minutes(target_clock(slot)) is not None:
         if now_minutes >= clock_minutes(target_clock(slot)):
             return "MULAI DRY"
-    if status == "SIAP_TURUN":
-        return "KELUARKAN"
-    if status == "SELESAI_DRY" and not slot.get("jam_turun_packing"):
-        return "KELUARKAN"
-    if status in {"PROSES", "DRY_ULANG"} and target_clock(slot):
-        if now_minutes >= clock_minutes(target_clock(slot)) - 30:
-            return "CEK DRY"
+    if state == "MENUNGGU_TURUN":
+        return "PILIH_TINDAKAN"
+    if state in {"SEDANG_DRY", "SEDANG_DRY_TAMBAHAN"}:
+        return "SELESAI_SETTING"
+    if state == "LAGI_ISI":
+        return "MULAI_DEFROST" if effective_defrost_required(slot) else "MULAI_DRY"
     return ""
 
 
@@ -578,12 +635,16 @@ def action_type_badge(slot):
 
 def action_priority_text(slot):
     action = current_action_type(slot)
-    if action == "CEK DRY":
-        return "Cek apakah dry sudah selesai"
-    if action == "KELUARKAN":
-        return "Cek apakah barang sudah turun ke packing"
-    if action == "MULAI DRY":
-        return "Mulai dry setelah defrost" if effective_defrost_required(slot) else "Mulai dry sekarang"
+    if action == "PILIH_TINDAKAN":
+        return "Pilih Lanjut Dry atau Turun Semua"
+    if action == "MULAI_DRY":
+        return "Mulai dry sekarang"
+    if action == "MULAI_DEFROST":
+        return "Mulai defrost terlebih dahulu"
+    if action == "SELESAI_SETTING":
+        return "Simpan jam selesai setting dry"
+    if action == "LANJUT_DRY":
+        return "Lanjut dry tambahan atau kembali ke Menunggu Turun"
     return "Cek slot sesuai perubahan terakhir"
 
 
@@ -609,8 +670,9 @@ def product_label(slot):
 
 
 def short_context_text(slot):
-    if slot.get("partial_out"):
-        return "Sebagian keluar"
+    helper = state_helper_text(slot)
+    if helper:
+        return helper
     action = current_action_type(slot)
     if action:
         return action_priority_text(slot)
@@ -629,16 +691,12 @@ def summary_item_markup(slot, emphasize_action=False):
     action_badge = ""
     if emphasize_action and current_action_type(slot):
         action_badge = f'<div class="sd-mini-badge">{html.escape(action_type_badge(slot))}</div>'
-    state_line = ""
-    if slot.get("partial_out"):
-        state_line = '<div class="sd-mini-state">SEBAGIAN KELUAR, SISA MASIH DRY</div>'
     return (
         '<div class="sd-mini-card">'
         f"{action_badge}"
         f'<div class="sd-mini-title">{html.escape(title)}</div>'
         f'<div class="sd-mini-meta">{html.escape(shift_line)}</div>'
         f'<div class="sd-mini-time">{html.escape(timing)}</div>'
-        f"{state_line}"
         f'<div class="sd-mini-action">{html.escape(context)}</div>'
         "</div>"
     )
@@ -664,15 +722,15 @@ def board_card_markup(slot):
 
 
 def quick_action_primary(slot):
-    status = slot.get("status_enum")
-    if status == "KOSONG":
-        return "defros" if effective_defrost_required(slot) and not slot.get("jam_defros") else "masuk"
-    if status == "PROSES" and effective_defrost_required(slot) and not slot.get("jam_defros") and process_stage(slot) != "DEFROST":
-        return "defros"
-    if status in {"PROSES", "DRY_ULANG"}:
+    state = operator_state(slot)
+    if state in {"KOSONG", "LAGI_ISI"}:
+        return "defros" if effective_defrost_required(slot) else "masuk"
+    if state == "DEFROST":
+        return "masuk"
+    if state == "SEDANG_DRY":
         return "selesai"
-    if status in {"SIAP_TURUN", "SELESAI_DRY"}:
-        return "turun"
+    if state == "SEDANG_DRY_TAMBAHAN":
+        return "selesai_tambahan"
     return ""
 
 
@@ -680,15 +738,27 @@ def quick_action_label(action):
     return {
         "masuk": "Mulai Dry",
         "defros": "Mulai Defrost",
-        "selesai": "Selesai Dry",
-        "turun": "Keluarkan ke Packing",
+        "selesai": "Selesai Setting Dry",
+        "selesai_tambahan": "Selesai Dry Tambahan",
+        "lanjut_dry": "Lanjut Dry",
+        "turun_semua": "Turun Semua",
         "kosong": "Set kosong",
         "tidak": "Set tidak dipakai",
     }.get(action, "")
 
 
+def quick_action_disabled_reason(slot, action):
+    if action in {"defros", "masuk"} and product_label(slot) == "-":
+        return "Isi produk dulu sebelum mulai dry."
+    if action in {"lanjut_dry", "turun_semua"} and not clean_text(slot.get("jam_selesai_dry")):
+        return "Jam Selesai Setting Dry belum tercatat."
+    return ""
+
+
 def visible_quick_actions(slot):
     primary = quick_action_primary(slot)
+    if operator_state(slot) == "MENUNGGU_TURUN":
+        return ["lanjut_dry", "turun_semua"]
     return [primary] if primary else []
 
 
@@ -868,17 +938,75 @@ def render_time_input_row(label, widget_key):
         )
 
 
+def field_visibility(slot):
+    state = operator_state(slot)
+    has_product_context = bool(
+        product_label(slot) != "-"
+        or slot.get("jam_masuk")
+        or slot.get("jam_defros")
+        or slot.get("jam_selesai_dry")
+        or slot.get("jam_turun_packing")
+    )
+    return {
+        "jam_defros": state == "DEFROST" or (state == "LAGI_ISI" and effective_defrost_required(slot)) or bool(slot.get("jam_defros")),
+        "jam_masuk": state in {"LAGI_ISI", "SEDANG_DRY", "SEDANG_DRY_TAMBAHAN"} and has_product_context,
+        "jam_selesai_dry": state in {"SEDANG_DRY", "SEDANG_DRY_TAMBAHAN"} and bool(slot.get("jam_masuk") or slot.get("jam_selesai_dry")),
+        "jam_turun_packing": state in {"MENUNGGU_TURUN", "LAGI_KELUARKAN"} or bool(slot.get("jam_turun_packing")),
+        "estimasi_defrost": state in {"LAGI_ISI", "DEFROST"} and effective_defrost_required(slot) and not slot.get("jam_masuk"),
+        "estimasi_keluar": state in {"SEDANG_DRY", "SEDANG_DRY_TAMBAHAN"} and bool(slot.get("jam_masuk") or slot.get("jam_estimasi_keluar")),
+        "partial_log": False,
+        "personnel": state not in {"KOSONG", "TIDAK_DIPAKAI"},
+    }
+
+
+def saved_value_lines(slot):
+    lines = []
+    mapping = [
+        ("Jam Defrost", slot.get("jam_defros")),
+        ("Jam Masuk", slot.get("jam_masuk")),
+        ("Jam Selesai Setting Dry", slot.get("jam_selesai_dry")),
+        ("Jam Turun Packing", slot.get("jam_turun_packing")),
+    ]
+    for label, value in mapping:
+        if clean_text(value):
+            lines.append(f"{label}: {value}")
+    return lines
+
+
+def render_saved_summary(slot):
+    next_action = action_priority_text(slot) if current_action_type(slot) else "Tidak ada tindakan lanjutan sekarang."
+    values = saved_value_lines(slot)
+    value_text = "<br/>".join(html.escape(line) for line in values) if values else "Belum ada nilai waktu yang tersimpan."
+    st.markdown(
+        f"""
+        <div class="sd-saved-box">
+          <div class="sd-saved-title">Tersimpan untuk slot ini</div>
+          <div class="sd-saved-row"><strong>Status sekarang</strong><span>{html.escape(slot_state_label(slot))}</span></div>
+          <div class="sd-saved-row"><strong>Nilai tersimpan</strong><span>{value_text}</span></div>
+          <div class="sd-saved-row"><strong>Langkah berikut</strong><span>{html.escape(next_action)}</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_readonly_summary(label, value):
+    st.text_input(label, value=clean_text(value), disabled=True)
+
+
 def render_detail():
     sync_editor_widgets_from_selected_slot()
     report = st.session_state["report"]
     slot = report["slots"][report["selected_slot"] - 1]
+    visibility = field_visibility(slot)
+    state = operator_state(slot)
     st.markdown("### Detail slot")
     st.markdown(
         f"""
         <div class="sd-detail-head">
           <strong>No.{slot['slot_no']} | {html.escape(product_label(slot))}</strong>
           <span>{html.escape(slot_state_label(slot))}</span>
-          <span>{html.escape(slot_update_type(slot))}</span>
+          <span>{html.escape(state_helper_text(slot) or slot_update_type(slot))}</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -889,9 +1017,18 @@ def render_detail():
         action_cols = st.columns(max(1, len(actions)))
         for idx, action in enumerate(actions):
             with action_cols[idx]:
-                if st.button(quick_action_label(action), key=f"qa_{action}", type="primary", use_container_width=True):
+                disabled_reason = quick_action_disabled_reason(slot, action)
+                if st.button(
+                    quick_action_label(action),
+                    key=f"qa_{action}",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=bool(disabled_reason),
+                ):
                     apply_quick_action(action)
                     st.rerun()
+                if disabled_reason:
+                    st.caption(disabled_reason)
 
     danger_actions = available_danger_actions(slot)
     if danger_actions:
@@ -911,32 +1048,40 @@ def render_detail():
                 st.info("Defrost tidak diperlukan lagi, tetapi catatan defrost lama tetap tersimpan.")
             else:
                 st.info("Jalur slot ini tanpa defrost.")
-        if slot.get("partial_out"):
-            st.warning("SEBAGIAN KELUAR, SISA MASIH DRY")
 
     with st.expander("Catatan waktu / detail record", expanded=False):
-        st.caption("Bagian ini untuk melengkapi catatan. Status papan tetap mengikuti aksi cepat.")
+        st.caption("Lengkapi hanya field yang memang dipakai pada status sekarang.")
+        if state == "MENUNGGU_TURUN":
+            st.markdown("**Dry selesai, pilih tindakan berikutnya**")
+            s1, s2 = st.columns(2)
+            with s1:
+                render_readonly_summary("Jam Masuk", slot.get("jam_masuk"))
+            with s2:
+                render_readonly_summary("Jam Selesai Setting Dry", slot.get("jam_selesai_dry"))
         c1, c2 = st.columns(2)
         with c1:
-            render_time_input_row("Jam Masuk", "jam_masuk")
-            if st.session_state["needs_defrost"] == "yes":
+            if visibility["jam_defros"] and state in {"LAGI_ISI", "DEFROST"}:
                 render_time_input_row("Jam Defrost", "jam_defros")
+            if visibility["jam_masuk"] and state in {"LAGI_ISI", "SEDANG_DRY", "SEDANG_DRY_TAMBAHAN"}:
+                render_time_input_row("Jam Masuk", "jam_masuk")
+            if visibility["estimasi_defrost"] and st.session_state["needs_defrost"] == "yes":
                 st.text_input("Estimasi Selesai Defrost", key="jam_estimasi_defrost", placeholder="HH:mm")
-            st.text_input("Estimasi Keluar", key="jam_estimasi_keluar", placeholder="HH:mm")
-            render_time_input_row("Jam Selesai Dry", "jam_selesai_dry")
+            if visibility["jam_selesai_dry"] and state in {"SEDANG_DRY", "SEDANG_DRY_TAMBAHAN"}:
+                render_time_input_row("Jam Selesai Setting Dry", "jam_selesai_dry")
+            if visibility["estimasi_keluar"] and state in {"SEDANG_DRY", "MENUNGGU_TURUN", "SEDANG_DRY_TAMBAHAN"}:
+                st.text_input("Estimasi Keluar", key="jam_estimasi_keluar", placeholder="HH:mm")
         with c2:
-            st.selectbox("Sebagian Keluar?", options=["no", "yes"], format_func=lambda x: "Ya" if x == "yes" else "Tidak", key="partial_out")
-            if st.session_state["partial_out"] == "yes":
-                st.text_input("Jam Keluar Sebagian", key="jam_keluar_sebagian", placeholder="HH:mm")
-                st.text_input("Estimasi Selesai Sisa", key="jam_estimasi_sisa", placeholder="HH:mm")
-            render_time_input_row("Jam Turun Packing", "jam_turun_packing")
+            if visibility["jam_turun_packing"] and state in {"MENUNGGU_TURUN", "LAGI_KELUARKAN"}:
+                render_time_input_row("Jam Turun Packing", "jam_turun_packing")
 
-        st.text_input("Petugas Masuk", key="petugas_masuk")
-        st.text_input("Petugas Keluar", key="petugas_keluar")
-        st.text_input("Atas Izin", key="atas_izin")
+        if visibility["personnel"]:
+            st.text_input("Petugas Masuk", key="petugas_masuk")
+            st.text_input("Petugas Keluar", key="petugas_keluar")
+            st.text_input("Atas Izin", key="atas_izin")
         st.text_input("Catatan", key="notes")
 
     sync_report_from_widgets()
+    render_saved_summary(report["slots"][report["selected_slot"] - 1])
 
 
 def render_header_controls(server_state):
@@ -1161,6 +1306,34 @@ def main():
         .sd-detail-head span {
           font-size: 0.85rem;
           color: #536476;
+        }
+        .sd-saved-box {
+          margin-top: 12px;
+          border: 1px solid #d7e0e8;
+          border-radius: 14px;
+          background: #f8fbfd;
+          padding: 11px 12px;
+        }
+        .sd-saved-title {
+          font-size: 0.86rem;
+          font-weight: 900;
+          color: #39577a;
+          margin-bottom: 8px;
+        }
+        .sd-saved-row {
+          display: grid;
+          gap: 4px;
+          margin-top: 8px;
+        }
+        .sd-saved-row strong {
+          font-size: 0.8rem;
+          color: #526476;
+        }
+        .sd-saved-row span {
+          font-size: 0.9rem;
+          font-weight: 700;
+          color: #162536;
+          line-height: 1.35;
         }
         </style>
         """,

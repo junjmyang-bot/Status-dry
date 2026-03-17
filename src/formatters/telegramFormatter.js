@@ -1,13 +1,3 @@
-const STATUS_LABEL = {
-  TIDAK_DIPAKAI: 'TIDAK DIPAKAI',
-  KOSONG: 'KOSONG',
-  PROSES: 'PROSES',
-  SIAP_TURUN: 'SIAP_TURUN',
-  SELESAI_DRY: 'SELESAI_DRY',
-  TURUN_PACKING: 'TURUN_PACKING',
-  DRY_ULANG: 'DRY_ULANG'
-};
-
 function cleanText(value) {
   if (value === undefined || value === null) return '';
   return String(value).trim();
@@ -76,15 +66,59 @@ function slotGroup(slot) {
 
 function needsAction(slot) {
   const status = cleanText(slot.status_enum) || 'KOSONG';
-  if (status === 'SIAP_TURUN') return true;
-  if (status === 'SELESAI_DRY' && !cleanText(slot.jam_turun_packing)) return true;
-  if (status === 'PROSES' || status === 'DRY_ULANG') return true;
+  if ((status === 'SIAP_TURUN' || status === 'SELESAI_DRY') && !cleanText(slot.jam_turun_packing)) return true;
+  if ((status === 'PROSES' || status === 'DRY_ULANG') && cleanText(slot.jam_selesai_dry)) return true;
   return false;
 }
 
+function effectiveDefrostRequired(slot) {
+  if (slot.needs_defrost === true || slot.needs_defrost === false) return slot.needs_defrost;
+  if (cleanText(slot.jam_defros)) return true;
+  return !cleanText(slot.status_isi).toLowerCase().includes('dry ulang');
+}
+
+function processStage(slot) {
+  const status = cleanText(slot.status_enum) || 'KOSONG';
+  if (!['PROSES', 'SIAP_TURUN', 'SELESAI_DRY', 'DRY_ULANG'].includes(status)) return '';
+  if (effectiveDefrostRequired(slot) && cleanText(slot.jam_defros) && !cleanText(slot.jam_masuk)) return 'DEFROST';
+  if (status === 'DRY_ULANG') return 'SEDANG_DRY_TAMBAHAN';
+  if ((status === 'SIAP_TURUN' || status === 'SELESAI_DRY') || (cleanText(slot.jam_selesai_dry) && !cleanText(slot.jam_turun_packing))) return 'MENUNGGU_TURUN';
+  if (cleanText(slot.jam_masuk)) return 'SEDANG_DRY';
+  return 'LAGI_ISI';
+}
+
+function clockMinutes(value) {
+  const normalized = normalizeClock(value);
+  if (!normalized) return null;
+  const [hh, mm] = normalized.split(':').map(Number);
+  return hh * 60 + mm;
+}
+
+function targetClock(slot) {
+  if (processStage(slot) === 'DEFROST' && effectiveDefrostRequired(slot)) return cleanText(slot.jam_estimasi_defrost);
+  return cleanText(slot.jam_estimasi_keluar);
+}
+
+function currentActionType(slot) {
+  const status = cleanText(slot.status_enum) || 'KOSONG';
+  const nowMinutes = clockMinutes(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' }));
+  const target = clockMinutes(targetClock(slot));
+  if (processStage(slot) === 'DEFROST' && target !== null && nowMinutes !== null && nowMinutes >= target) return 'MULAI_DRY';
+  if (processStage(slot) === 'MENUNGGU_TURUN') return 'PILIH_TINDAKAN';
+  if (processStage(slot) === 'SEDANG_DRY_TAMBAHAN' || processStage(slot) === 'SEDANG_DRY') return 'SELESAI_SETTING';
+  return '';
+}
+
 function statusLabel(slot) {
-  if (slot.partial_out) return 'SEBAGIAN KELUAR, SISA MASIH DRY';
-  return STATUS_LABEL[slot.status_enum] || cleanText(slot.status_enum) || '-';
+  if (cleanText(slot.status_enum) === 'TURUN_PACKING' || cleanText(slot.jam_turun_packing)) return 'LAGI KELUARKAN';
+  if (processStage(slot) === 'MENUNGGU_TURUN') return 'MENUNGGU TURUN';
+  if (processStage(slot) === 'DEFROST') return 'DEFROST';
+  if (processStage(slot) === 'SEDANG_DRY_TAMBAHAN') return 'SEDANG DRY TAMBAHAN';
+  if (processStage(slot) === 'SEDANG_DRY') return 'SEDANG DRY';
+  if (['PROSES', 'SIAP_TURUN', 'SELESAI_DRY', 'DRY_ULANG'].includes(cleanText(slot.status_enum))) return 'LAGI ISI';
+  if (cleanText(slot.status_enum) === 'KOSONG') return 'KOSONG';
+  if (cleanText(slot.status_enum) === 'TIDAK_DIPAKAI') return 'TIDAK DIPAKAI';
+  return cleanText(slot.status_enum) || '-';
 }
 
 function summaryCounts(report) {
